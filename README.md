@@ -123,13 +123,20 @@ tmmscope inject --kubeconfig ./kubeconfig --namespace default \
 tmmscope eject --context calico
 ```
 
-Two cluster shapes:
+`tmmscope inject` **auto-detects** the cluster shape (override with
+`--mode auto|patch|webhook`):
 
-- **Direct patch** *(implemented)* — for a plain `f5-tmm` Deployment (e.g.
-  `tmmlitectl` clusters): a strategic-merge patch adds the sidecar container.
-- **Admission webhook** *(planned)* — for operator-managed FLO/BNK pods, where a
-  direct patch would be reconciled away; a mutating webhook injects the sidecar
-  at pod creation.
+- **Direct patch** — for a plain `f5-tmm` Deployment (e.g. `tmmlitectl`
+  clusters): a strategic-merge patch adds the sidecar container.
+- **Admission webhook** — for operator-managed FLO/BNK pods (the `f5-tmm`
+  Deployment is owned by the `F5Tmm` CR, so a direct patch is reconciled away):
+  tmmscope deploys a mutating webhook with a self-signed serving cert (no
+  cert-manager dependency) that injects the sidecar at pod admission, then rolls
+  the tmm pods. `tmmscope eject` tears the webhook back down.
+
+For an operator-managed cluster without a bnk-edge `net1` interface (so the URL
+can't be auto-derived), pass `--remote-write-url` pointing at the node's docker
+gateway, e.g. `http://172.19.0.1:9491/api/v1/write`.
 
 ### Offline / air-gapped fallback
 

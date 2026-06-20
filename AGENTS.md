@@ -54,6 +54,7 @@ linking client-go — keep it that way unless there's a strong reason.
 1. Receiver (`up`/`down`/`status`/`endpoint`) — **done**
 2. Canonical exporter + multi-arch ghcr publish — **done** (publish on first tag)
 3. `inject`/`eject` direct-patch — **done**
-4. `inject` admission-webhook path for operator-managed FLO/BNK pods — **planned**
+4. `inject` admission-webhook path for operator-managed FLO/BNK pods — **done**
+   (auto-detected via ownerReferences; self-signed cert, no cert-manager)
 5. `tmmlitectl` / `ocibnkctl` discover tmmscope (and optionally drop their own
    injection in favor of `tmmscope inject`) — **planned, decision deferred**
