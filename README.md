@@ -138,6 +138,17 @@ For an operator-managed cluster without a bnk-edge `net1` interface (so the URL
 can't be auto-derived), pass `--remote-write-url` pointing at the node's docker
 gateway, e.g. `http://172.19.0.1:9491/api/v1/write`.
 
+### Targeting & confirmation
+
+`inject`/`eject` are **per-cluster and stateless**: they act on the one cluster
+your kubeconfig points at. `--kubeconfig` is optional — with no flag they use
+kubectl's ambient resolution (`$KUBECONFIG` → `~/.kube/config`); `--context`
+selects a context within it. Before changing anything, both **probe** the target
+(is it tmmlite or FLO? which context/API server?) and require a `y/N`
+confirmation that names the exact cluster — pass `--yes`/`-y` to skip it in
+scripts. `eject` removes the sidecar from that one cluster only (it is never
+global); to clear several, run it once per `--context`.
+
 ### Offline / air-gapped fallback
 
 When a cluster can't pull from ghcr, build and import the image into the nodes,
