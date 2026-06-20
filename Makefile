@@ -19,7 +19,7 @@ build:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/tmmscope ./cmd/tmmscope
 
 install: build
-	install -m 0755 bin/tmmscope $(or $(PREFIX),/usr/local)/bin/tmmscope
+	install -m 0755 bin/tmmscope $(HOME)/.local/bin/tmmscope
 
 test:
 	go test ./... -count=1
