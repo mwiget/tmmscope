@@ -1,0 +1,110 @@
+# tmmscope — mutating admission webhook that injects the tmm-stat-exporter
+# sidecar into operator-managed f5-tmm pods at admission (a direct Deployment
+# patch would be reconciled away). Self-signed serving cert + caBundle, so no
+# cert-manager dependency. failurePolicy: Ignore — telemetry must never wedge tmm
+# pod creation.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tmm-stat-webhook-tls
+  namespace: {{ .Namespace }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ .Certs.ServerCertB64 }}
+  tls.key: {{ .Certs.ServerKeyB64 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tmm-stat-webhook
+  namespace: {{ .Namespace }}
+  labels:
+    app: tmm-stat-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tmm-stat-webhook
+  template:
+    metadata:
+      labels:
+        app: tmm-stat-webhook
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: webhook
+          image: {{ .WebhookImage }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --remote-write-url={{ .RemoteWriteURL }}
+            - --cluster={{ .ClusterName }}
+            - --exporter-image={{ .ExporterImage }}
+          ports:
+            - containerPort: 8443
+          readinessProbe:
+            tcpSocket:
+              port: 8443
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 50m, memory: 64Mi}
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: tmm-stat-webhook-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tmm-stat-webhook
+  namespace: {{ .Namespace }}
+spec:
+  selector:
+    app: tmm-stat-webhook
+  ports:
+    - port: 443
+      targetPort: 8443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: tmm-stat-webhook-{{ .Namespace }}
+webhooks:
+  - name: tmm-stat.tmmscope.io
+    clientConfig:
+      service:
+        name: tmm-stat-webhook
+        namespace: {{ .Namespace }}
+        path: /mutate
+        port: 443
+      caBundle: {{ .Certs.CABundleB64 }}
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        scope: Namespaced
+    objectSelector:
+      matchLabels:
+        {{ .TargetLabelKey }}: {{ .TargetLabelValue }}
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Namespace }}
+    failurePolicy: Ignore
+    sideEffects: None
+    admissionReviewVersions: ["v1"]

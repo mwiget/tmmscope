@@ -27,6 +27,7 @@ type Options struct {
 	Cluster        string // value for the cluster= label on every series
 	RemoteWriteURL string // full remote_write URL; empty = auto-derive
 	Image          string // exporter image
+	WebhookImage   string // webhook image (webhook mode only)
 }
 
 // Inject patches the Deployment to add the sidecar. It is idempotent: a
@@ -37,7 +38,7 @@ func Inject(o Options) error {
 		"spec": map[string]any{
 			"template": map[string]any{
 				"spec": map[string]any{
-					"containers": []any{sidecarContainer(o)},
+					"containers": []any{SidecarSpec(o)},
 				},
 			},
 		},
@@ -55,7 +56,11 @@ func Eject(o Options) error {
 	return o.patch(patch)
 }
 
-func sidecarContainer(o Options) map[string]any {
+// SidecarSpec builds the tmm-stat-exporter container as a plain map (so both the
+// direct-patch path here and the admission webhook can emit identical specs
+// without depending on k8s.io/api). The cluster label and remote_write URL come
+// from Options.
+func SidecarSpec(o Options) map[string]any {
 	labels := fmt.Sprintf("cluster=%s,pod=$(POD_NAME),node=$(NODE_NAME)", o.Cluster)
 	return map[string]any{
 		"name":            sidecarName,

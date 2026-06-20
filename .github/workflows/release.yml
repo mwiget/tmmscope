@@ -11,8 +11,13 @@ permissions:
   packages: write   # push to ghcr.io
 
 jobs:
-  exporter-image:
+  images:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - { name: tmm-stat-exporter, dockerfile: cmd/tmm-stat-exporter/Dockerfile }
+          - { name: tmm-stat-webhook,  dockerfile: cmd/tmm-stat-webhook/Dockerfile }
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -22,16 +27,16 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build & push multi-arch exporter
+      - name: Build & push multi-arch ${{ matrix.image.name }}
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: cmd/tmm-stat-exporter/Dockerfile
+          file: ${{ matrix.image.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/mwiget/tmm-stat-exporter:${{ github.ref_name }}
-            ghcr.io/mwiget/tmm-stat-exporter:latest
+            ghcr.io/mwiget/${{ matrix.image.name }}:${{ github.ref_name }}
+            ghcr.io/mwiget/${{ matrix.image.name }}:latest
 
   cli-binaries:
     runs-on: ubuntu-latest

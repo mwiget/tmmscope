@@ -159,6 +159,8 @@ func cmdInject(args []string) error {
 	fs, o := injectFlags("inject")
 	fs.StringVar(&o.RemoteWriteURL, "remote-write-url", "", "full remote_write URL (default: auto-derive from the bnk-edge gateway)")
 	fs.StringVar(&o.Image, "image", inject.DefaultImage, "tmm-stat-exporter image")
+	fs.StringVar(&o.WebhookImage, "webhook-image", inject.DefaultWebhookImage, "tmm-stat-webhook image (webhook mode)")
+	mode := fs.String("mode", "auto", "injection mode: auto|patch|webhook (auto detects operator-managed pods)")
 	_ = fs.Parse(args)
 
 	if o.Cluster == "" {
@@ -167,19 +169,31 @@ func cmdInject(args []string) error {
 	if o.Cluster == "" {
 		return fmt.Errorf("could not infer a cluster label; pass --cluster")
 	}
+
+	resolved, err := resolveMode(*mode, *o)
+	if err != nil {
+		return err
+	}
 	if o.RemoteWriteURL == "" {
-		e, err := stack.Status()
-		if err != nil || e.Prometheus.Port == 0 {
+		e, serr := stack.Status()
+		if serr != nil || e.Prometheus.Port == 0 {
 			return fmt.Errorf("tmmscope is not running; start it with 'tmmscope up' or pass --remote-write-url")
 		}
-		url, err := inject.DeriveRemoteWriteURL(*o, e.Prometheus.Port)
-		if err != nil {
-			return err
+		url, derr := inject.DeriveRemoteWriteURL(*o, e.Prometheus.Port)
+		if derr != nil {
+			return derr
 		}
 		o.RemoteWriteURL = url
 	}
-	fmt.Printf("injecting %s into %s/%s (cluster=%s) → %s\n", o.Image, o.Namespace, o.Deployment, o.Cluster, o.RemoteWriteURL)
-	if err := inject.Inject(*o); err != nil {
+
+	fmt.Printf("injecting (%s mode) %s into %s/%s (cluster=%s) → %s\n",
+		resolved, o.Image, o.Namespace, o.Deployment, o.Cluster, o.RemoteWriteURL)
+	if resolved == inject.ModeWebhook {
+		err = inject.InjectWebhook(*o)
+	} else {
+		err = inject.Inject(*o)
+	}
+	if err != nil {
 		return err
 	}
 	fmt.Println("injected. metrics will appear in Grafana under cluster=" + o.Cluster)
@@ -188,12 +202,36 @@ func cmdInject(args []string) error {
 
 func cmdEject(args []string) error {
 	fs, o := injectFlags("eject")
+	mode := fs.String("mode", "auto", "injection mode: auto|patch|webhook")
 	_ = fs.Parse(args)
-	if err := inject.Eject(*o); err != nil {
+
+	resolved, err := resolveMode(*mode, *o)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("ejected tmm-stat-exporter from %s/%s\n", o.Namespace, o.Deployment)
+	if resolved == inject.ModeWebhook {
+		err = inject.EjectWebhook(*o)
+	} else {
+		err = inject.Eject(*o)
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Printf("ejected tmm-stat-exporter (%s mode) from %s/%s\n", resolved, o.Namespace, o.Deployment)
 	return nil
+}
+
+// resolveMode turns the --mode flag into a concrete mode, auto-detecting from
+// the target Deployment's ownership when set to "auto".
+func resolveMode(mode string, o inject.Options) (inject.Mode, error) {
+	switch inject.Mode(mode) {
+	case inject.ModePatch, inject.ModeWebhook:
+		return inject.Mode(mode), nil
+	case inject.ModeAuto:
+		return inject.DetectMode(o)
+	default:
+		return "", fmt.Errorf("invalid --mode %q (auto|patch|webhook)", mode)
+	}
 }
 
 func cmdOpen(args []string) error {
