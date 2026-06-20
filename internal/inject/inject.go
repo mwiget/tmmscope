@@ -141,16 +141,36 @@ func (o Options) configArgs(args ...string) []string {
 }
 
 // DeriveRemoteWriteURL best-effort computes the push URL for a local
-// docker-based tmmlite cluster: it reads the target pod's CNI network-status
-// annotation, finds the bnk-edge interface (net1), and uses the .1 host gateway
-// of that subnet with the given Prometheus port. Returns an error if it can't
-// determine the interface (caller should then require an explicit --remote-write-url).
+// docker-based cluster, with the given Prometheus port. Two topologies are
+// handled; in both the host running tmmscope is reachable at a .1 gateway:
+//
+//   - tmmlite: the f5-tmm pod has a multus bnk-edge interface (net1); the .1 of
+//     that subnet is the host.
+//   - FLO/calico (e.g. ocibnkctl, k3s-in-docker): no dedicated edge interface;
+//     the tmm pod egresses via its node, whose default gateway (the .1 of the
+//     node's docker network) is the host.
+//
+// Returns an error if neither applies (caller should then require an explicit
+// --remote-write-url).
 func DeriveRemoteWriteURL(o Options, port int) (string, error) {
+	if gw, ok := multusGateway(o); ok {
+		return fmt.Sprintf("http://%s:%d/api/v1/write", gw, port), nil
+	}
+	if gw, ok := nodeGateway(o); ok {
+		return fmt.Sprintf("http://%s:%d/api/v1/write", gw, port), nil
+	}
+	return "", fmt.Errorf("could not auto-derive the remote_write gateway for this cluster; "+
+		"pass --remote-write-url (e.g. http://<host-gateway>:%d/api/v1/write)", port)
+}
+
+// multusGateway derives the host gateway from the f5-tmm pod's multus bnk-edge
+// (non-default) interface — the tmmlite topology.
+func multusGateway(o Options) (string, bool) {
 	args := o.kubectlArgs("get", "pods", "-l", "app="+o.Deployment,
 		"-o", `jsonpath={.items[0].metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}`)
 	out, err := exec.Command("kubectl", args...).Output()
-	if err != nil {
-		return "", fmt.Errorf("reading pod network-status: %w", err)
+	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+		return "", false
 	}
 	var nets []struct {
 		Interface string   `json:"interface"`
@@ -158,19 +178,45 @@ func DeriveRemoteWriteURL(o Options, port int) (string, error) {
 		IPs       []string `json:"ips"`
 	}
 	if err := json.Unmarshal(out, &nets); err != nil {
-		return "", fmt.Errorf("parsing network-status (no CNI annotation? pass --remote-write-url): %w", err)
+		return "", false
 	}
 	for _, n := range nets {
 		if n.Default || len(n.IPs) == 0 {
 			continue
 		}
-		gw, err := gatewayOf(n.IPs[0])
-		if err != nil {
-			return "", err
+		if gw, err := gatewayOf(n.IPs[0]); err == nil {
+			return gw, true
 		}
-		return fmt.Sprintf("http://%s:%d/api/v1/write", gw, port), nil
 	}
-	return "", fmt.Errorf("no non-default (bnk-edge) interface on the f5-tmm pod; pass --remote-write-url")
+	return "", false
+}
+
+// nodeGateway derives the host gateway from the InternalIP of the node hosting
+// the f5-tmm pod — the FLO/calico topology, where the pod egresses via its node
+// and the node's docker-network gateway (.1) is the host.
+func nodeGateway(o Options) (string, bool) {
+	podArgs := o.kubectlArgs("get", "pods", "-l", "app="+o.Deployment,
+		"-o", "jsonpath={.items[0].spec.nodeName}")
+	nodeOut, err := exec.Command("kubectl", podArgs...).Output()
+	node := strings.TrimSpace(string(nodeOut))
+	if err != nil || node == "" {
+		return "", false
+	}
+	nodeArgs := o.configArgs("get", "node", node,
+		"-o", `jsonpath={.status.addresses[?(@.type=="InternalIP")].address}`)
+	ipOut, err := exec.Command("kubectl", nodeArgs...).Output()
+	if err != nil {
+		return "", false
+	}
+	ip := strings.Fields(strings.TrimSpace(string(ipOut)))
+	if len(ip) == 0 {
+		return "", false
+	}
+	gw, err := gatewayOf(ip[0])
+	if err != nil {
+		return "", false
+	}
+	return gw, true
 }
 
 // gatewayOf returns the .1 address of the /24 the given IPv4 address sits in.
