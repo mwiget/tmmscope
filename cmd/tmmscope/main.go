@@ -315,9 +315,13 @@ func cmdOpen(args []string) error {
 }
 
 func printHuman(e *stack.Endpoints) {
-	fmt.Printf("  Grafana:           %s\n", e.Grafana.URL)
+	// The ports publish on 0.0.0.0 (all host interfaces), so localhost is only a
+	// convenience — Grafana/Prometheus are equally reachable at the host's LAN,
+	// Tailscale, or any other IP. Spell that out; "localhost" misleads.
+	fmt.Printf("  Grafana:           http://localhost:%d   (bound on 0.0.0.0 — also http://<host-ip>:%d)\n",
+		e.Grafana.Port, e.Grafana.Port)
 	fmt.Printf("  TMM dashboard:     %s\n", e.Grafana.DashboardURL)
-	fmt.Printf("  Prometheus:        %s\n", e.Prometheus.URL)
+	fmt.Printf("  Prometheus:        http://localhost:%d   (bound on 0.0.0.0)\n", e.Prometheus.Port)
 	fmt.Printf("  remote_write port: %d  (producers push to http://<host-gateway>:%d%s)\n",
 		e.Prometheus.Port, e.Prometheus.Port, e.Prometheus.RemoteWritePath)
 }
