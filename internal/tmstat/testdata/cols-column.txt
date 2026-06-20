@@ -1,0 +1,11 @@
+name    tableid offset size type rule dropped next
+------- ------- ------ ---- ---- ---- ------- ----
+name          1      0   49    3    0       0  257
+tableid       1     49    2    2    0       0  258
+offset        1     51    2    2    3       0  259
+size          1     53    2    2    3       0  260
+type          1     55    1    2    5       0  261
+rule          1     56    2    2    5       0  262
+dropped       1     58    1    2    5       0  263
+next          1     59    4    2    5       0    0
+

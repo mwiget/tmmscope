@@ -1,0 +1,314 @@
+name                                tableid offset size type rule dropped
+----------------------------------- ------- ------ ---- ---- ---- -------
+name                                    291      0  256    3    0       0
+destination                             291    256   20    6    0       0
+source                                  291    276   20    6    0       0
+site                                    291   1748  256    3    5       0
+vs_index                                291    300    4    2    5       0
+tenant_index                            291   2008    8    2    5       0
+cs_min_conn_dur                         291    312    8    2    2       0
+cs_max_conn_dur                         291    320    8    2    2       0
+cs_mean_conn_dur                        291    328    8    2    2       0
+no_nodes_errors                         291    336    8    2    2       0
+cycle_count                             291    344    8    2    2       0
+delta_busy                              291    352    8    2    2       0
+delta_cycles                            291    360    8    2    2       0
+conf_status                             291    304    8    3    5       0
+no_acl_match                            291    368    8    2    2       0
+no_acl_match_accept                     291    376    8    2    2       0
+no_acl_match_drop                       291    384    8    2    2       0
+no_acl_match_reject                     291    392    8    2    2       0
+last_hit_time_enforced_acl              291    400    8    2    4       0
+no_staged_acl_match                     291    408    8    2    2       0
+no_staged_acl_match_accept              291    416    8    2    2       0
+no_staged_acl_match_drop                291    424    8    2    2       0
+no_staged_acl_match_reject              291    432    8    2    2       0
+last_hit_time_staged_acl                291    440    8    2    4       0
+clientside.pkts_in                      291    448    8    2    2       0
+clientside.bytes_in                     291    456    8    2    2       0
+clientside.pkts_out                     291    464    8    2    2       0
+clientside.bytes_out                    291    472    8    2    2       0
+clientside.max_conns                    291    480    8    2    2       0
+clientside.tot_conns                    291    488    8    2    2       0
+clientside.cur_conns                    291    496    8    2    2       0
+clientside.slow_conns                   291    512    8    2    2       0
+clientside.expired_conns                291    520    8    2    2       0
+clientside.slow_killed                  291    528    8    2    2       0
+clientside.evicted_conns                291    536    8    2    2       0
+clientside.other_killed                 291    544    8    2    2       0
+pva.pkts_in                             291    656    8    2    2       0
+pva.bytes_in                            291    664    8    2    2       0
+pva.pkts_out                            291    672    8    2    2       0
+pva.bytes_out                           291    680    8    2    2       0
+pva.max_conns                           291    688    8    2    2       0
+pva.tot_conns                           291    696    8    2    2       0
+pva.cur_conns                           291    704    8    2    2       0
+ephemeral.pkts_in                       291    760    8    2    2       0
+ephemeral.bytes_in                      291    768    8    2    2       0
+ephemeral.pkts_out                      291    776    8    2    2       0
+ephemeral.bytes_out                     291    784    8    2    2       0
+ephemeral.max_conns                     291    792    8    2    2       0
+ephemeral.tot_conns                     291    800    8    2    2       0
+ephemeral.cur_conns                     291    808    8    2    2       0
+tot_requests                            291    864    8    2    2       0
+tot_pva_assist_conn                     291    872    8    2    2       0
+curr_pva_assist_conn                    291    880    8    2    2       0
+max_pva_assist_conn                     291    888    8    2    2       0
+curr_pva_assist_conn_lowpri             291    896    8    2    2       0
+curr_pva_assist_conn_mediumpri          291    904    8    2    2       0
+curr_pva_assist_conn_highpri            291    912    8    2    2       0
+pva_priority_increase                   291    920    8    2    2       0
+pva_priority_decrease                   291    928    8    2    2       0
+pva_attempted_insertion                 291    936    8    2    2       0
+serverside.pkts_in                      291    552    8    2    2       0
+serverside.bytes_in                     291    560    8    2    2       0
+serverside.pkts_out                     291    568    8    2    2       0
+serverside.bytes_out                    291    576    8    2    2       0
+serverside.max_conns                    291    584    8    2    2       0
+serverside.tot_conns                    291    592    8    2    2       0
+serverside.cur_conns                    291    600    8    2    2       0
+serverside.slow_conns                   291    616    8    2    2       0
+serverside.expired_conns                291    624    8    2    2       0
+serverside.slow_killed                  291    632    8    2    2       0
+serverside.evicted_conns                291    640    8    2    2       0
+serverside.other_killed                 291    648    8    2    2       0
+precision.tot_sync                      291    944    8    2    2       0
+precision.tot_async                     291    952    8    2    2       0
+precision.delayed                       291    960    8    2    2       0
+precision.tot_rejected                  291    968    8    2    2       0
+precision.tot_retry                     291    976    8    2    2       0
+precision.is_locked                     291    984    8    2    4       0
+precision.tot_locked                    291    992    8    2    2       0
+precision.tot_unlocked                  291   1000    8    2    2       0
+precision.last_locked                   291   1008    8    2    4       0
+precision.dura_locked                   291   1016    8    2    4       0
+precision.latency                       291   1024    8    2    4       0
+precision.last_value                    291   1032    8    2    4       0
+precision.value                         291   1040    8    2    4       0
+syncookies.hwsyncookie_inst             291   1048    2    2    2       0
+syncookies.swsyncookie_inst             291   1050    2    2    2       0
+syncookies.syncache_curr                291   1052    4    2    2       0
+syncookies.syncache_over                291   1056    8    2    2       0
+syncookies.syncookies                   291   1080    8    2    2       0
+syncookies.accepts                      291   1088    8    2    2       0
+syncookies.rejects                      291   1096    8    2    2       0
+syncookies.hw_syncookies                291   1104    8    2    2       0
+syncookies.hw_accepts                   291   1112    8    2    2       0
+syncookies.wl_hits                      291   1128    8    2    2       0
+syncookies.wl_accepts                   291   1136    8    2    2       0
+syncookies.wl_rejects                   291   1144    8    2    2       0
+sc_curr_valid0                          291   1184    8    2    2       0
+sc_curr_sent0                           291   1192    8    2    2       0
+sc_curr_valid1                          291   1280    8    2    2       0
+sc_curr_sent1                           291   1288    8    2    2       0
+sc_mode0                                291   1159    4    3    5       0
+sc_mode1                                291   1255    4    3    5       0
+hwdns.hwdns_inst                        291   1344    1    2    2       0
+hwdns.swdns_inst                        291   1345    1    2    2       0
+hwdns.vlans_hw                          291   1346    2    2    2       0
+hwdns.vlans_sw                          291   1348    2    2    2       0
+hwdns.back_inserts                      291   1352    8    2    2       0
+hwdns.back_evicts                       291   1360    8    2    2       0
+hwdns.request_hits                      291   1368    8    2    2       0
+no_fw_nat_policy                        291   1376    8    2    2       0
+no_fw_nat_rule_match                    291   1384    8    2    2       0
+fw_nat_match_failures                   291   1392    8    2    2       0
+stress_stats.stress1s                   291   1408    8    2    5       0
+stress_stats.rexmttimeo                 291   1416    8    2    2       0
+stress_stats.sndprobe                   291   1424    8    2    2       0
+stress_stats.rcvecncepack               291   1432    8    2    2       0
+stress_stats.abandons                   291   1440    8    2    2       0
+stress_stats.rxunreach                  291   1448    8    2    2       0
+stress_stats.serversynrtx               291   1456    8    2    2       0
+stress_stats.handshaketimeout           291   1464    8    2    2       0
+stress_stats.expires                    291   1472    8    2    2       0
+stress_stats.dns_req                    291   1480    8    2    2       0
+stress_stats.dns_resp                   291   1488    8    2    2       0
+stress_stats.context_type               291   1400    1    2    5       0
+afm_ad_en                               291   1720    1    2    5       0
+hornet.client_syn_received              291   1496    8    2    2       0
+hornet.normal_teardowns_completed       291   1504    8    2    2       0
+hornet.duplicate_syn_received           291   1512    8    2    2       0
+hornet.client_rst_received              291   1520    8    2    2       0
+hornet.server_rst_received              291   1528    8    2    2       0
+hornet.port_retry_count                 291   1536    8    2    2       0
+hornet.way_collision_count              291   1544    8    2    2       0
+hornet.way_full_count                   291   1552    8    2    2       0
+hornet.client_pkt_unknown_flow          291   1560    8    2    2       0
+hornet.server_pkt_unknown_flow          291   1568    8    2    2       0
+hornet.connection_created               291   1576    8    2    2       0
+hornet.embryonic_promoted               291   1584    8    2    2       0
+hornet.client_pkt_expired_embryonic     291   1592    8    2    2       0
+hornet.server_pkt_expired_embryonic     291   1600    8    2    2       0
+hornet.client_pkt_expired_active        291   1608    8    2    2       0
+hornet.server_pkt_expired_active        291   1616    8    2    2       0
+hornet.client_pkt_expired_timewait      291   1624    8    2    2       0
+hornet.server_pkt_expired_timewait      291   1632    8    2    2       0
+hornet.action_drop                      291   1640    8    2    2       0
+hornet.action_reset                     291   1648    8    2    2       0
+hornet.action_xform                     291   1656    8    2    2       0
+hornet.action_fwd                       291   1664    8    2    2       0
+msg.msg_in                              291   1672    8    2    2       0
+msg.msg_out                             291   1680    8    2    2       0
+msg.req_in                              291   1688    8    2    2       0
+msg.req_out                             291   1696    8    2    2       0
+msg.resp_in                             291   1704    8    2    2       0
+msg.resp_out                            291   1712    8    2    2       0
+
+  next
+------
+121349
+121350
+121351
+121352
+121353
+121354
+121355
+121356
+121357
+121358
+121359
+121360
+121361
+121362
+121363
+121364
+121365
+121366
+121367
+121368
+121369
+121370
+121371
+121372
+121373
+121374
+121375
+121376
+121377
+121378
+121379
+121380
+121381
+121382
+121383
+121384
+121385
+121386
+121387
+121388
+121389
+121390
+121391
+121392
+121393
+121394
+121395
+121396
+121397
+121398
+121399
+121400
+121401
+121402
+121403
+121404
+121405
+121406
+121600
+121601
+121602
+121603
+121604
+121605
+121606
+121607
+121608
+121609
+121610
+121611
+121612
+121613
+121614
+121615
+121616
+121617
+121618
+121619
+121620
+121621
+121622
+121623
+121624
+121625
+121626
+121627
+121628
+121629
+121630
+121631
+121632
+121633
+121634
+121635
+121636
+121637
+121638
+121639
+121640
+121641
+121642
+121643
+121644
+121645
+121646
+121647
+121648
+121649
+121650
+121651
+121652
+121653
+121654
+121655
+121656
+121657
+121658
+121659
+121660
+121661
+121662
+121856
+121857
+121858
+121859
+121860
+121861
+121862
+121863
+121864
+121865
+121866
+121867
+121868
+121869
+121870
+121871
+121872
+121873
+121874
+121875
+121876
+121877
+121878
+121879
+121880
+121881
+121882
+121883
+121884
+121885
+121886
+121887
+     0
+

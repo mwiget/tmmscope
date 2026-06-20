@@ -1,0 +1,15 @@
+# tmmscope — Prometheus config.
+#
+# This Prometheus is a RECEIVER, not a scraper: tmm-stat-exporter sidecars in
+# each registered cluster push their tmstat metrics here via remote_write
+# (TMM hooks inbound TCP on its dataplane interfaces, so the sidecars cannot be
+# scraped — they push outbound to this host). Enabled by the
+# --web.enable-remote-write-receiver flag in the compose command; short
+# retention (--storage.tsdb.retention.time=24h) keeps this a live-monitoring
+# window, not a long-term store, and makes cleanup automatic when a cluster is
+# destroyed.
+global:
+  scrape_interval: 15s
+  external_labels:
+    source: tmmscope
+# No scrape_configs: all series arrive via remote_write at /api/v1/write.

@@ -1,0 +1,85 @@
+# Rendered by tmmscope — do not edit by hand (regenerated on every `tmmscope up`).
+#
+# Standalone Prometheus + Grafana for real-time TMM telemetry. Bridge networking
+# with published ports: Prometheus is a remote_write RECEIVER on the host's
+# {{.PrometheusPort}} (cluster tmm-stat-exporter sidecars push here via the host
+# gateway); Grafana serves the TMM Real-Time dashboard at the host's
+# {{.GrafanaPort}}. Grafana reaches Prometheus over the compose network
+# (prometheus:9090), so the published ports are only for external access.
+name: tmmscope
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: tmmscope-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+      - --web.enable-remote-write-receiver
+      - --web.listen-address=0.0.0.0:9090
+    ports:
+      - "{{.PrometheusPort}}:9090"
+    volumes:
+      - ./telemetry/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: tmmscope-grafana
+    environment:
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: "http://localhost:{{.GrafanaPort}}/"
+      # Allow the dashboard to be iframe-embedded; anonymous viewer so an embed
+      # needs no login (read-only).
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_USERS_DEFAULT_THEME: "dark"
+      GF_SECURITY_ADMIN_PASSWORD: "{{.GrafanaAdminPassword}}"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "{{.GrafanaPort}}:3000"
+    volumes:
+      - ./telemetry/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./telemetry/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

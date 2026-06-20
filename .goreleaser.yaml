@@ -1,0 +1,65 @@
+version: 2
+
+project_name: tmmscope
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: tmmscope
+    main: ./cmd/tmmscope
+    binary: tmmscope
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/mwiget/tmmscope/internal/version.Version={{.Version}}
+      - -X github.com/mwiget/tmmscope/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/mwiget/tmmscope/internal/version.BuildDate={{.Date}}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs(\\(.+\\))?:"
+      - "^test(\\(.+\\))?:"
+      - "^chore(\\(.+\\))?:"
+
+release:
+  draft: false
+  prerelease: false
+  header: |
+    ## tmmscope {{ .Tag }}
+
+    Standalone real-time TMM telemetry (Prometheus + Grafana + sidecar injection).
+    Download the archive for your platform, extract `tmmscope`, put it on `$PATH`:
+
+    ```
+    tmmscope version
+    ```
+
+    The `tmm-stat-exporter` sidecar image is published separately as a multi-arch
+    manifest at `ghcr.io/mwiget/tmm-stat-exporter:{{ .Tag }}`.
+  footer: |
+    **Full changelog**: https://github.com/mwiget/tmmscope/compare/{{ .PreviousTag }}...{{ .Tag }}

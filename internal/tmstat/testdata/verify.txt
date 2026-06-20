@@ -1,0 +1,144 @@
+Verify: File size is 4194304
+Verify: Segment ID is 1
+Verify: Slab size is 4096
+Verify: Slab count is 1024
+Verify: Table count is 412
+tmctl: tmstat_check_slab: slab 3 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 3 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 22 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 22 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 158 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 158 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 198 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 198 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 212 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 212 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 230 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 230 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 247 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 247 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 252 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 252 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 258 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 258 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 259 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 259 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 262 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 262 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 277 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 277 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 279 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 279 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 280 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 280 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 282 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 282 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 283 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 283 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 284 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 284 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 285 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 285 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 294 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 294 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 308 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 308 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 331 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 331 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 348 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 348 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 350 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 350 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 352 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 352 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 361 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 361 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 375 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 375 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 398 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 398 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 400 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 400 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 403 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 403 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 407 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 407 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 413 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 413 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 422 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 422 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 425 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 425 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 427 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 427 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 431 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 431 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 445 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 445 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 447 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 447 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 456 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 456 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 463 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 463 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 477 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 477 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 480 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 480 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 482 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 482 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 490 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 490 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 497 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 497 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 502 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 502 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 505 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 505 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 515 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 515 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 517 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 517 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 538 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 538 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 548 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 548 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 557 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 557 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 600 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 600 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 603 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 603 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 619 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 619 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 651 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 651 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 655 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 655 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 656 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 656 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 664 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 664 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 676 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 676 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 701 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 701 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 705 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 705 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 707 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 707 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 712 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 712 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 714 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 714 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 715 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 715 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 722 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 722 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 729 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 729 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 731 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 731 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_slab: slab 733 for table '.hash' lines_per_row 0 does not match 63 based on rowsz 4032
+tmctl: tmstat_check_slab: slab 733 for table '.hash' has zero lines_per_row
+tmctl: tmstat_check_table: table '.hash' column count is zero
