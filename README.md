@@ -11,12 +11,12 @@ a cluster, watch CPU / throughput / connections / per-pool-member load move in
 real time during a test or an incident.
 
 ```
-  ┌─ tmmscope up ──────────────┐         ┌─ tmmscope inject ─────────────┐
-  │  Prometheus  :9491 (RW recv)│  ◀────  │  tmm-stat-exporter sidecar    │
-  │  Grafana     :3000 (dash)   │ remote_ │  reads /var/tmstat, pushes    │
-  └─────────────────────────────┘ write   │  every 2s (cluster=<name>)    │
-        ^ host, any arch                   └───────────────────────────────┘
-                                              in f5-tmm pod, any arch
+  ┌─ tmmscope up ───────────────┐         ┌─ tmmscope inject ─────────┐
+  │  Prometheus  :9491 (RW recv)│  ◀────  │  tmm-stat-exporter sidecar│
+  │  Grafana     :3000 (dash)   │ remote_ │  reads /var/tmstat, pushes│
+  └─────────────────────────────┘ write   │  every 2s (cluster=<name>)│
+        ^ host, any arch                  └───────────────────────────┘
+                                            in f5-tmm pod, any arch
 ```
 
 ## Why it exists
