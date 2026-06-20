@@ -37,7 +37,7 @@ spec:
       containers:
         - name: webhook
           image: {{ .WebhookImage }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - --remote-write-url={{ .RemoteWriteURL }}
             - --cluster={{ .ClusterName }}
