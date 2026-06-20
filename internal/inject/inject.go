@@ -23,7 +23,8 @@ type Options struct {
 	Kubeconfig     string // --kubeconfig (empty = default resolution)
 	Context        string // --context (empty = current)
 	Namespace      string // target namespace (default "default")
-	Deployment     string // target deployment (default "f5-tmm")
+	Deployment     string // target Deployment/DaemonSet name (default "f5-tmm")
+	ResourceKind   string // "deployment" or "daemonset"; set by ProbeCluster
 	Cluster        string // value for the cluster= label on every series
 	RemoteWriteURL string // full remote_write URL; empty = auto-derive
 	Image          string // exporter image
@@ -83,8 +84,8 @@ func SidecarSpec(o Options) map[string]any {
 			"capabilities":             map[string]any{"drop": []any{"ALL"}},
 		},
 		"resources": map[string]any{
-			"requests": map[string]any{"cpu": "50m", "memory": "64Mi"},
-			"limits":   map[string]any{"cpu": "50m", "memory": "64Mi"},
+			"requests": map[string]any{"cpu": "50m", "memory": "256Mi"},
+			"limits":   map[string]any{"cpu": "50m", "memory": "256Mi"},
 		},
 		// No readiness/liveness probe: TMM hooks inbound TCP on its dataplane
 		// interfaces, so a kubelet probe to the pod IP can't reach the sidecar
@@ -103,9 +104,13 @@ func downward(name, path string) map[string]any {
 	}
 }
 
-// patch runs `kubectl patch deployment <name> --type strategic`.
+// patch runs `kubectl patch deployment|daemonset <name> --type strategic`.
 func (o Options) patch(body string) error {
-	args := o.kubectlArgs("patch", "deployment", o.Deployment, "--type", "strategic", "-p", body)
+	kind := o.ResourceKind
+	if kind == "" {
+		kind = "deployment"
+	}
+	args := o.kubectlArgs("patch", kind, o.Deployment, "--type", "strategic", "-p", body)
 	cmd := exec.Command("kubectl", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

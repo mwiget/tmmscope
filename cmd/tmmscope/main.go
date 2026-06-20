@@ -152,7 +152,7 @@ func injectFlags(name string) (*flag.FlagSet, *inject.Options) {
 	fs.StringVar(&o.Kubeconfig, "kubeconfig", "", "path to kubeconfig (default: kubectl resolution)")
 	fs.StringVar(&o.Context, "context", "", "kube context (default: current)")
 	fs.StringVar(&o.Namespace, "namespace", "default", "target namespace")
-	fs.StringVar(&o.Deployment, "deployment", "f5-tmm", "target f5-tmm Deployment name")
+	fs.StringVar(&o.Deployment, "deployment", "f5-tmm", "target f5-tmm Deployment/DaemonSet name")
 	fs.StringVar(&o.Cluster, "cluster", "", "cluster= label on every series (default: context name)")
 	return fs, o
 }
@@ -174,10 +174,11 @@ func cmdInject(args []string) error {
 		return err
 	}
 	if !probe.Found {
-		return fmt.Errorf("no %q Deployment in namespace %q on context %q (%s)\n"+
+		return fmt.Errorf("no %q Deployment/DaemonSet in namespace %q on context %q (%s)\n"+
 			"is this the right cluster? use --context / --kubeconfig / --namespace / --deployment",
 			o.Deployment, o.Namespace, probe.Context, probe.Server)
 	}
+	o.ResourceKind = probe.ResourceKind
 	if o.Cluster == "" {
 		o.Cluster = probe.Context
 	}
@@ -240,6 +241,7 @@ func cmdEject(args []string) error {
 	if err != nil {
 		return err
 	}
+	o.ResourceKind = probe.ResourceKind
 	resolved, err := pickMode(*mode, probe)
 	if err != nil {
 		return err
