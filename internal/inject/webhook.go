@@ -25,22 +25,6 @@ const (
 	ModeWebhook Mode = "webhook"
 )
 
-// DetectMode inspects the target Deployment: if it is owned by a controller
-// (e.g. the F5Tmm operator), a direct patch would be reconciled away, so the
-// webhook path is required. A plain Deployment (tmmlitectl-shape) takes a patch.
-func DetectMode(o Options) (Mode, error) {
-	args := o.kubectlArgs("get", "deployment", o.Deployment, "-o",
-		"jsonpath={.metadata.ownerReferences[?(@.controller==true)].kind}")
-	out, err := exec.Command("kubectl", args...).Output()
-	if err != nil {
-		return "", fmt.Errorf("inspecting %s: %w", o.Deployment, err)
-	}
-	if strings.TrimSpace(string(out)) != "" {
-		return ModeWebhook, nil
-	}
-	return ModePatch, nil
-}
-
 // InjectWebhook deploys the self-signed-cert mutating webhook and rolls the
 // target pods so the sidecar is injected at recreation.
 func InjectWebhook(o Options) error {

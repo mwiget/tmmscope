@@ -127,6 +127,19 @@ func (o Options) kubectlArgs(args ...string) []string {
 	return append(pre, args...)
 }
 
+// configArgs prefixes only the kubeconfig/context flags (no namespace) — for
+// `kubectl config ...` queries used to identify the target cluster.
+func (o Options) configArgs(args ...string) []string {
+	var pre []string
+	if o.Kubeconfig != "" {
+		pre = append(pre, "--kubeconfig", o.Kubeconfig)
+	}
+	if o.Context != "" {
+		pre = append(pre, "--context", o.Context)
+	}
+	return append(pre, args...)
+}
+
 // DeriveRemoteWriteURL best-effort computes the push URL for a local
 // docker-based tmmlite cluster: it reads the target pod's CNI network-status
 // annotation, finds the bnk-edge interface (net1), and uses the .1 host gateway

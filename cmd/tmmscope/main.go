@@ -3,12 +3,14 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/mwiget/tmmscope/internal/inject"
 	"github.com/mwiget/tmmscope/internal/stack"
@@ -161,16 +163,29 @@ func cmdInject(args []string) error {
 	fs.StringVar(&o.Image, "image", inject.DefaultImage, "tmm-stat-exporter image")
 	fs.StringVar(&o.WebhookImage, "webhook-image", inject.DefaultWebhookImage, "tmm-stat-webhook image (webhook mode)")
 	mode := fs.String("mode", "auto", "injection mode: auto|patch|webhook (auto detects operator-managed pods)")
+	yes := fs.Bool("yes", false, "skip the confirmation prompt")
+	fs.BoolVar(yes, "y", false, "skip the confirmation prompt (shorthand)")
 	_ = fs.Parse(args)
 
+	// Probe the (ambient or flagged) kubeconfig: identify the cluster and whether
+	// it actually runs an f5-tmm before changing anything.
+	probe, err := inject.ProbeCluster(*o)
+	if err != nil {
+		return err
+	}
+	if !probe.Found {
+		return fmt.Errorf("no %q Deployment in namespace %q on context %q (%s)\n"+
+			"is this the right cluster? use --context / --kubeconfig / --namespace / --deployment",
+			o.Deployment, o.Namespace, probe.Context, probe.Server)
+	}
 	if o.Cluster == "" {
-		o.Cluster = o.Context
+		o.Cluster = probe.Context
 	}
 	if o.Cluster == "" {
 		return fmt.Errorf("could not infer a cluster label; pass --cluster")
 	}
 
-	resolved, err := resolveMode(*mode, *o)
+	resolved, err := pickMode(*mode, probe)
 	if err != nil {
 		return err
 	}
@@ -186,8 +201,22 @@ func cmdInject(args []string) error {
 		o.RemoteWriteURL = url
 	}
 
-	fmt.Printf("injecting (%s mode) %s into %s/%s (cluster=%s) → %s\n",
-		resolved, o.Image, o.Namespace, o.Deployment, o.Cluster, o.RemoteWriteURL)
+	fmt.Printf("Detected %s f5-tmm in namespace %q\n", probe.Kind, o.Namespace)
+	fmt.Printf("  context:       %s\n", probe.Context)
+	fmt.Printf("  cluster (API): %s\n", probe.Server)
+	fmt.Printf("  inject mode:   %s\n", resolved)
+	fmt.Printf("  exporter:      %s\n", o.Image)
+	if resolved == inject.ModeWebhook {
+		fmt.Printf("  webhook:       %s\n", o.WebhookImage)
+	}
+	fmt.Printf("  stream label:  cluster=%s\n", o.Cluster)
+	fmt.Printf("  remote_write:  %s\n", o.RemoteWriteURL)
+	fmt.Println("  note: this rolls the f5-tmm pod(s).")
+	if !*yes && !confirm("Inject the tmm-stat-exporter sidecar?") {
+		fmt.Println("aborted.")
+		return nil
+	}
+
 	if resolved == inject.ModeWebhook {
 		err = inject.InjectWebhook(*o)
 	} else {
@@ -203,12 +232,28 @@ func cmdInject(args []string) error {
 func cmdEject(args []string) error {
 	fs, o := injectFlags("eject")
 	mode := fs.String("mode", "auto", "injection mode: auto|patch|webhook")
+	yes := fs.Bool("yes", false, "skip the confirmation prompt")
+	fs.BoolVar(yes, "y", false, "skip the confirmation prompt (shorthand)")
 	_ = fs.Parse(args)
 
-	resolved, err := resolveMode(*mode, *o)
+	probe, err := inject.ProbeCluster(*o)
 	if err != nil {
 		return err
 	}
+	resolved, err := pickMode(*mode, probe)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Eject tmm-stat-exporter (%s mode) from %s/%s\n", resolved, o.Namespace, o.Deployment)
+	fmt.Printf("  context:       %s\n", probe.Context)
+	fmt.Printf("  cluster (API): %s\n", probe.Server)
+	fmt.Println("  note: this rolls the f5-tmm pod(s).")
+	if !*yes && !confirm("Proceed?") {
+		fmt.Println("aborted.")
+		return nil
+	}
+
 	if resolved == inject.ModeWebhook {
 		err = inject.EjectWebhook(*o)
 	} else {
@@ -221,16 +266,31 @@ func cmdEject(args []string) error {
 	return nil
 }
 
-// resolveMode turns the --mode flag into a concrete mode, auto-detecting from
-// the target Deployment's ownership when set to "auto".
-func resolveMode(mode string, o inject.Options) (inject.Mode, error) {
+// pickMode resolves --mode: an explicit patch|webhook wins; auto uses the probed
+// mode (errors if the probe couldn't classify the target).
+func pickMode(mode string, p inject.Probe) (inject.Mode, error) {
 	switch inject.Mode(mode) {
 	case inject.ModePatch, inject.ModeWebhook:
 		return inject.Mode(mode), nil
 	case inject.ModeAuto:
-		return inject.DetectMode(o)
+		if p.Mode == "" {
+			return "", fmt.Errorf("could not determine injection mode; pass --mode patch|webhook")
+		}
+		return p.Mode, nil
 	default:
 		return "", fmt.Errorf("invalid --mode %q (auto|patch|webhook)", mode)
+	}
+}
+
+// confirm prompts for a y/N answer on stdin.
+func confirm(prompt string) bool {
+	fmt.Printf("%s [y/N]: ", prompt)
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	switch strings.TrimSpace(strings.ToLower(line)) {
+	case "y", "yes":
+		return true
+	default:
+		return false
 	}
 }
 
