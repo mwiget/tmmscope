@@ -141,14 +141,15 @@ func (o Options) configArgs(args ...string) []string {
 }
 
 // DeriveRemoteWriteURL best-effort computes the push URL for a local
-// docker-based cluster, with the given Prometheus port. Two topologies are
-// handled; in both the host running tmmscope is reachable at a .1 gateway:
+// docker-based cluster, with the given Prometheus port. The discriminator is
+// whether the f5-tmm pod has a multus bnk-edge interface; in both cases the host
+// running tmmscope is reachable at a .1 gateway:
 //
-//   - tmmlite: the f5-tmm pod has a multus bnk-edge interface (net1); the .1 of
-//     that subnet is the host.
-//   - FLO/calico (e.g. ocibnkctl, k3s-in-docker): no dedicated edge interface;
-//     the tmm pod egresses via its node, whose default gateway (the .1 of the
-//     node's docker network) is the host.
+//   - multus edge interface (e.g. tmmlite): the pod sits directly on a
+//     host-bridged multus network (net1); the .1 of that subnet is the host.
+//   - no edge interface (e.g. FLO/BNK on plain pod networking, k3s-in-docker):
+//     the pod egresses via its node, whose default gateway (the .1 of the node's
+//     docker network) is the host.
 //
 // Returns an error if neither applies (caller should then require an explicit
 // --remote-write-url).
@@ -164,7 +165,7 @@ func DeriveRemoteWriteURL(o Options, port int) (string, error) {
 }
 
 // multusGateway derives the host gateway from the f5-tmm pod's multus bnk-edge
-// (non-default) interface — the tmmlite topology.
+// (non-default) interface — the "multus edge interface" path (e.g. tmmlite).
 func multusGateway(o Options) (string, bool) {
 	args := o.kubectlArgs("get", "pods", "-l", "app="+o.Deployment,
 		"-o", `jsonpath={.items[0].metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}`)
@@ -192,8 +193,9 @@ func multusGateway(o Options) (string, bool) {
 }
 
 // nodeGateway derives the host gateway from the InternalIP of the node hosting
-// the f5-tmm pod — the FLO/calico topology, where the pod egresses via its node
-// and the node's docker-network gateway (.1) is the host.
+// the f5-tmm pod — the "no edge interface" path (e.g. FLO/BNK on plain pod
+// networking), where the pod egresses via its node and the node's docker-network
+// gateway (.1) is the host.
 func nodeGateway(o Options) (string, bool) {
 	podArgs := o.kubectlArgs("get", "pods", "-l", "app="+o.Deployment,
 		"-o", "jsonpath={.items[0].spec.nodeName}")
