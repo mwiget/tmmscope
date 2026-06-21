@@ -57,6 +57,34 @@ tmmscope open                      # open the TMM Real-Time dashboard
 | `tmmscope eject` | Remove the sidecar |
 | `tmmscope open` | Open the dashboard in a browser |
 
+## Registry caching (regcachectl)
+
+If the companion [`regcachectl`](https://github.com/mwiget/regcachectl) fleet of
+local pull-through caches is running, `tmmscope up` **auto-detects** it and pulls
+the stack's Prometheus + Grafana images through the local `docker.io` cache
+instead of re-pulling from Docker Hub on every rebuild — the same fleet
+`tmmlitectl` / `ocibnkctl` use for their clusters.
+
+```bash
+regcachectl up        # bring up the local cache fleet (once)
+tmmscope up           # auto-detects regcache-dockerhub and pulls through it:
+                      #   registry cache: pulling stack images through
+                      #   regcachectl docker.io cache at localhost:5000
+```
+
+Both stack images live on `docker.io`, so only that one cache is used; the
+sidecar image (`ghcr.io`) is pulled by the **cluster's** nodes, so it's wired by
+whatever built the cluster (`tmmlitectl`/`ocibnkctl`), not here. Detection reads
+the cache's actual published host port, so a non-default `regcachectl --port-base`
+is honored automatically.
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--registry-cache auto` | `auto` | Use the cache if the fleet is up, else pull direct |
+| `--registry-cache on` | | Require the cache; error if the fleet isn't running |
+| `--registry-cache off` | | Always pull directly from `docker.io` |
+| `--registry-cache-host <host>` | `localhost` | Host the stack uses to reach the cache |
+
 ## Ports & the discovery contract
 
 `tmmscope` prefers the well-known ports **9491** (Prometheus remote_write

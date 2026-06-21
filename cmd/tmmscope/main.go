@@ -81,12 +81,23 @@ func cmdUp(args []string) error {
 	promPort := fs.Int("prometheus-port", 0, "host port for Prometheus remote_write (0 = negotiate from 9491)")
 	grafPort := fs.Int("grafana-port", 0, "host port for Grafana (0 = negotiate from 3000)")
 	pw := fs.String("grafana-password", os.Getenv("TMMSCOPE_GRAFANA_PASSWORD"), "Grafana admin password")
+	regCache := fs.String("registry-cache", "auto", "pull stack images through a local regcachectl docker.io cache: auto|on|off")
+	regCacheHost := fs.String("registry-cache-host", "localhost", "host the stack uses to reach the regcachectl cache")
 	_ = fs.Parse(args)
+
+	mirror, err := stack.ResolveDockerHubMirror(stack.RegistryCacheMode(*regCache), *regCacheHost)
+	if err != nil {
+		return err
+	}
+	if mirror != "" {
+		fmt.Printf("registry cache: pulling stack images through regcachectl docker.io cache at %s\n", mirror)
+	}
 
 	e, err := stack.Up(stack.UpOptions{
 		PrometheusPort:       *promPort,
 		GrafanaPort:          *grafPort,
 		GrafanaAdminPassword: *pw,
+		DockerHubMirror:      mirror,
 	})
 	if err != nil {
 		return err
