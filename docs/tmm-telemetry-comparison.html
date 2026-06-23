@@ -24,7 +24,8 @@
        border-bottom: 1px solid #cfe0ea; break-after: avoid; }
   p { margin: 4pt 0; }
   table { border-collapse: collapse; width: 100%; margin: 5pt 0 2pt 0; font-size: 8.5pt; break-inside: auto; }
-  th, td { border: 1px solid #c9d4dc; padding: 4pt 6pt; vertical-align: top; text-align: left; }
+  th, td { border: 1px solid #c9d4dc; padding: 4pt 6pt; vertical-align: top; text-align: left;
+           overflow-wrap: anywhere; word-break: break-word; }
   th { background: #eef4f8; color: #0b3d5c; font-weight: bold; }
   td.k { background: #f7f9fb; font-weight: bold; width: 21%; color: #333; }
   col.c { width: 39.5%; }
@@ -243,6 +244,121 @@ tmmscope dashboard observes TMM dataplane traffic.</p>
 not arise; it is a deliberately minimal, curated set driven by a single <code>cluster</code> variable. Its
 narrower scope also means it carries none of the aggregator-infrastructure panels, and vice versa &mdash;
 the two are complementary views rather than alternatives.</p>
+
+<h2>9. Metric naming and coverage</h2>
+<p class="lead">The two dashboards share no metrics, but that is a property of the dashboards, not
+the data. tmmscope reads the same <code>tmstat</code> tables that F5's metric catalog
+(<code>cnf-otel-stats</code>) is built from, so the overlap is best described at three levels:
+source, naming, and scope.</p>
+<table>
+  <colgroup><col style="width:18%"><col><col></colgroup>
+  <tr><th>Level</th><th>Overlap with F5 cnf-otel-stats</th><th>Detail</th></tr>
+  <tr><td class="k">Source data</td>
+      <td>High</td>
+      <td>tmmscope's four tables (<code>tmm_stat</code>, <code>virtual_server_stat</code>, <code>pool_member_stat</code>, <code>interface_stat</code>) are all categories in F5's catalog; same <code>tmstat</code> origin, same underlying values.</td></tr>
+  <tr><td class="k">Metric names</td>
+      <td>None</td>
+      <td>Three separate naming generations (table below); not interchangeable without relabeling.</td></tr>
+  <tr><td class="k">Coverage</td>
+      <td>Subset</td>
+      <td>tmmscope exports 4 tables (L4 traffic, connections, CPU cycles, interfaces). cnf-otel-stats spans 40+ tables (DNS, FW/NAT/CGNAT, DOS, TCP/HTTP/FTP/RTSP profiles, VLANs, ICMP, protocol inspection, &hellip;).</td></tr>
+</table>
+
+<p>What tmmscope collects is also wider than what it plots: the exporter emits every numeric column
+of each configured table as <code>f5tmm_&lt;table&gt;_&lt;column&gt;</code> (hundreds of fields), while the
+shipped dashboard surfaces about seven of them. The remaining series are present in Prometheus and
+available for additional panels.</p>
+
+<p style="margin-top:8pt"><b>Same source field, three names</b></p>
+<table>
+  <colgroup><col style="width:26%"><col style="width:25%"><col style="width:24%"><col style="width:25%"></colgroup>
+  <tr><th>tmstat source field</th><th>tmmscope</th><th>F5 v1 (raw)</th><th>F5 v2 (standardized)</th></tr>
+  <tr><td><code>virtual_server_stat</code> &middot; <code>clientside.bytes_in</code></td>
+      <td><code>f5tmm_virtual_server_clientside_bytes_in</code></td>
+      <td><code>virtual_server_stat/[name]/clientside.bytes_in</code></td>
+      <td><code>f5.virtual_server.clientside.received.bytes</code></td></tr>
+  <tr><td><code>pool_member_stat</code> &middot; <code>serverside.pkts_out</code></td>
+      <td><code>f5tmm_pool_member_serverside_pkts_out</code></td>
+      <td><code>pool_member_stat/&hellip;/serverside.pkts_out</code></td>
+      <td><code>f5.pool_member.serverside.transmitted.packets</code></td></tr>
+  <tr><td><code>tmm_stat</code> &middot; <code>tm_idle_cycles</code></td>
+      <td><code>f5tmm_tmm_tm_idle_cycles</code></td>
+      <td><code>tmm_stat/tm_idle_cycles</code></td>
+      <td>TMM core stats</td></tr>
+</table>
+<p class="note">The same source value appears in every row; only the metric string differs. tmmscope's
+<code>f5tmm_*</code> names are distinct from both the F5 v1 raw table paths and the v2 <code>f5.*</code> namespace.</p>
+
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 cnf-otel-stats catalog</th><th>tmmscope</th></tr>
+  <tr><td class="k">Type metadata</td>
+      <td>OTLP semantics assigned per metric (Cumulative / Maximum / Minimum / Instance).</td>
+      <td>All series emitted as <code>gauge</code>, including monotonic counters; counter behaviour is recovered with PromQL <code>rate()</code>.</td></tr>
+  <tr><td class="k">Surface filtering</td>
+      <td>Full, unfiltered metric surface.</td>
+      <td>tmm's internal control-plane objects (leading-<code>_</code> pools/virtuals, link-local addresses) are dropped before export.</td></tr>
+</table>
+<p class="note">Net: against the dataplane catalog the two overlap substantially in substance (same four
+tmstat tables, same field values) but not in metric names (a distinct <code>f5tmm_*</code> generation) and
+not in breadth (a curated subset of a 40+ table catalog).</p>
+
+<h2>10. F5 v1 vs v2 vs tmmscope</h2>
+<p class="lead">F5 exposes TMM stats in two generations. Sections 1&ndash;7 above describe the
+<b>v2</b> (aggregated) path; <b>v1</b> is an older, non-aggregated path that is in some respects
+closer to tmmscope. The key contrast is how each reaches Prometheus.</p>
+<p><b>How v1 streams to Prometheus:</b> in v1, <code>tmstatsd</code> inside TMM streams metrics
+(OTLP) directly to the OTEL collector &mdash; <i>without aggregation</i> &mdash; and Prometheus scrapes
+that collector. v1 <b>bypasses the Receiver/Observer aggregator entirely</b>; v2 instead routes the
+in-pod TMM Scraper through Receiver&nbsp;&rarr;&nbsp;Observer (where aggregation happens) before the same
+OTEL collector. Both v1 and v2 are therefore push-to-OTEL then pull-by-Prometheus; tmmscope skips OTEL
+and pushes <code>remote_write</code> straight to Prometheus.</p>
+<table>
+  <colgroup><col style="width:16%"><col style="width:28%"><col style="width:28%"><col style="width:28%"></colgroup>
+  <tr><th>Aspect</th><th>F5 v1 (raw)</th><th>F5 v2 (aggregated)</th><th>tmmscope</th></tr>
+  <tr><td class="k">Collection from TMM</td>
+      <td><code>tmstatsd</code> streams from TMM.</td>
+      <td>In-pod TMM Scraper (replaces <code>tmstatsd</code>) streams <code>tmctl</code> to the Receiver on request, gRPC + mTLS.</td>
+      <td>Sidecar reads the <code>tmstat</code> shared-memory segment in-pod.</td></tr>
+  <tr><td class="k">Aggregation tier</td>
+      <td>None &mdash; bypasses Receiver/Observer.</td>
+      <td>Receiver + Observer StatefulSets.</td>
+      <td>None.</td></tr>
+  <tr><td class="k">Aggregation</td>
+      <td>None; raw per-TMM.</td>
+      <td>Aggregated / Semi-Aggregated / Diagnostic (per table).</td>
+      <td>None; aggregation done at query time in PromQL.</td></tr>
+  <tr><td class="k">Path to Prometheus</td>
+      <td><code>tmstatsd</code> &rarr; OTEL collector &rarr; Prometheus scrape.</td>
+      <td>Scraper &rarr; Receiver &rarr; Observer &rarr; OTEL collector &rarr; Prometheus scrape.</td>
+      <td>Sidecar &rarr; <code>remote_write</code> &rarr; Prometheus (no OTEL).</td></tr>
+  <tr><td class="k">Prometheus ingestion</td>
+      <td>Pull (scrape of the OTEL collector).</td>
+      <td>Pull (scrape of the OTEL collector).</td>
+      <td>Push (<code>remote_write</code>).</td></tr>
+  <tr><td class="k">Transport security</td>
+      <td>HTTPS + mTLS scrape of the OTEL collector.</td>
+      <td>HTTPS + mTLS scrape; gRPC + mTLS on the internal hops.</td>
+      <td>Plain HTTP on the data path.</td></tr>
+  <tr><td class="k">Metric naming</td>
+      <td>Raw table-based, e.g. <code>virtual_server_stat/[name]/clientside.bytes_out</code>.</td>
+      <td>Standardized fixed names, e.g. <code>f5.virtual_server.clientside.received.bytes</code>.</td>
+      <td><code>f5tmm_&lt;table&gt;_&lt;column&gt;</code>, e.g. <code>f5tmm_virtual_server_clientside_bytes_out</code>.</td></tr>
+  <tr><td class="k">Identity labels</td>
+      <td><code>host.name</code>, <code>tmmID</code> (per-TMM instance).</td>
+      <td><code>namespace</code>, target namespace, <code>observer.job.mode</code> (aggregation state).</td>
+      <td><code>pod</code> / <code>node</code> + the table's key columns.</td></tr>
+  <tr><td class="k">Per-TMM granularity</td>
+      <td>Always (raw per-TMM).</td>
+      <td>Only in Diagnostic mode; otherwise merged.</td>
+      <td>Always.</td></tr>
+</table>
+<p class="note">In granularity and the absence of an aggregation tier, v1 is the closest F5 analog to
+tmmscope; they differ mainly in the egress (v1 goes through OTEL and is scraped over mTLS; tmmscope pushes
+<code>remote_write</code> over plain HTTP) and in naming. v2 adds the aggregation tier and standardized
+<code>f5.*</code> names on top of the same TMM source data. The page does not restate the Prometheus scrape
+step for v1 specifically, but the OTEL collector is the documented Prometheus integration point for both
+generations.</p>
 
 <h2>Summary</h2>
 <p>The two pipelines occupy different points on the same design space. The F5 CNF Stats
