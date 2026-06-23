@@ -81,12 +81,23 @@ func cmdUp(args []string) error {
 	promPort := fs.Int("prometheus-port", 0, "host port for Prometheus remote_write (0 = negotiate from 9491)")
 	grafPort := fs.Int("grafana-port", 0, "host port for Grafana (0 = negotiate from 3000)")
 	pw := fs.String("grafana-password", os.Getenv("TMMSCOPE_GRAFANA_PASSWORD"), "Grafana admin password")
+	regCache := fs.String("registry-cache", "auto", "pull stack images through a local regcachectl docker.io cache: auto|on|off")
+	regCacheHost := fs.String("registry-cache-host", "localhost", "host the stack uses to reach the regcachectl cache")
 	_ = fs.Parse(args)
+
+	mirror, err := stack.ResolveDockerHubMirror(stack.RegistryCacheMode(*regCache), *regCacheHost)
+	if err != nil {
+		return err
+	}
+	if mirror != "" {
+		fmt.Printf("registry cache: pulling stack images through regcachectl docker.io cache at %s\n", mirror)
+	}
 
 	e, err := stack.Up(stack.UpOptions{
 		PrometheusPort:       *promPort,
 		GrafanaPort:          *grafPort,
 		GrafanaAdminPassword: *pw,
+		DockerHubMirror:      mirror,
 	})
 	if err != nil {
 		return err
@@ -162,7 +173,8 @@ func cmdInject(args []string) error {
 	fs.StringVar(&o.RemoteWriteURL, "remote-write-url", "", "full remote_write URL (default: auto-derive from the bnk-edge gateway)")
 	fs.StringVar(&o.Image, "image", inject.DefaultImage, "tmm-stat-exporter image")
 	fs.StringVar(&o.WebhookImage, "webhook-image", inject.DefaultWebhookImage, "tmm-stat-webhook image (webhook mode)")
-	mode := fs.String("mode", "auto", "injection mode: auto|patch|webhook (auto detects operator-managed pods)")
+	permanent := fs.Bool("permanent", false, "install a durable sidecar (rolls/restarts f5-tmm pods); default is ephemeral, no restart")
+	mode := fs.String("mode", "auto", "permanent-injection target: auto|patch|webhook (only used with --permanent)")
 	yes := fs.Bool("yes", false, "skip the confirmation prompt")
 	fs.BoolVar(yes, "y", false, "skip the confirmation prompt (shorthand)")
 	_ = fs.Parse(args)
@@ -186,10 +198,6 @@ func cmdInject(args []string) error {
 		return fmt.Errorf("could not infer a cluster label; pass --cluster")
 	}
 
-	resolved, err := pickMode(*mode, probe)
-	if err != nil {
-		return err
-	}
 	if o.RemoteWriteURL == "" {
 		e, serr := stack.Status()
 		if serr != nil || e.Prometheus.Port == 0 {
@@ -205,19 +213,41 @@ func cmdInject(args []string) error {
 	fmt.Printf("Detected %s f5-tmm in namespace %q\n", probe.Kind, o.Namespace)
 	fmt.Printf("  context:       %s\n", probe.Context)
 	fmt.Printf("  cluster (API): %s\n", probe.Server)
-	fmt.Printf("  inject mode:   %s\n", resolved)
 	fmt.Printf("  exporter:      %s\n", o.Image)
-	if resolved == inject.ModeWebhook {
-		fmt.Printf("  webhook:       %s\n", o.WebhookImage)
-	}
 	fmt.Printf("  stream label:  cluster=%s\n", o.Cluster)
 	fmt.Printf("  remote_write:  %s\n", o.RemoteWriteURL)
-	fmt.Println("  note: this rolls the f5-tmm pod(s).")
-	if !*yes && !confirm("Inject the tmm-stat-exporter sidecar?") {
-		fmt.Println("aborted.")
+
+	if !*permanent {
+		// Default: ephemeral container on each live pod — tmm keeps running.
+		fmt.Println("  inject mode:   ephemeral (no f5-tmm restart)")
+		fmt.Println("  note: ephemeral containers are transient — they don't survive a pod")
+		fmt.Println("        restart and aren't re-added automatically. Use --permanent for a")
+		fmt.Println("        durable sidecar (which restarts the pod[s]).")
+		if !*yes && !confirm("Inject the tmm-stat-exporter as an ephemeral container?") {
+			fmt.Println("aborted.")
+			return nil
+		}
+		if err := inject.InjectEphemeral(*o); err != nil {
+			return err
+		}
+		fmt.Println("injected (ephemeral). metrics will appear in Grafana under cluster=" + o.Cluster)
 		return nil
 	}
 
+	// --permanent: durable sidecar via patch (standalone) or webhook (operator-managed).
+	resolved, err := pickMode(*mode, probe)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("  inject mode:   permanent / %s\n", resolved)
+	if resolved == inject.ModeWebhook {
+		fmt.Printf("  webhook:       %s\n", o.WebhookImage)
+	}
+	fmt.Println("  WARNING: permanent injection rolls (restarts) the f5-tmm pod(s).")
+	if !*yes && !confirm("Permanently inject the sidecar and restart f5-tmm pod(s)?") {
+		fmt.Println("aborted.")
+		return nil
+	}
 	if resolved == inject.ModeWebhook {
 		err = inject.InjectWebhook(*o)
 	} else {
@@ -226,13 +256,14 @@ func cmdInject(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("injected. metrics will appear in Grafana under cluster=" + o.Cluster)
+	fmt.Println("injected (permanent). metrics will appear in Grafana under cluster=" + o.Cluster)
 	return nil
 }
 
 func cmdEject(args []string) error {
 	fs, o := injectFlags("eject")
-	mode := fs.String("mode", "auto", "injection mode: auto|patch|webhook")
+	permanent := fs.Bool("permanent", false, "eject a durable sidecar (patch/webhook); default clears an ephemeral injection")
+	mode := fs.String("mode", "auto", "permanent-eject target: auto|patch|webhook (only used with --permanent)")
 	yes := fs.Bool("yes", false, "skip the confirmation prompt")
 	fs.BoolVar(yes, "y", false, "skip the confirmation prompt (shorthand)")
 	_ = fs.Parse(args)
@@ -242,15 +273,33 @@ func cmdEject(args []string) error {
 		return err
 	}
 	o.ResourceKind = probe.ResourceKind
+
+	if !*permanent {
+		// Default: clear an ephemeral injection by recreating the pods (the only
+		// way to drop an ephemeral container).
+		fmt.Printf("Clear ephemeral tmm-stat-exporter from %s/%s\n", o.Namespace, o.Deployment)
+		fmt.Printf("  context:       %s\n", probe.Context)
+		fmt.Printf("  cluster (API): %s\n", probe.Server)
+		fmt.Println("  note: ephemeral containers can't be removed in place — this recreates the f5-tmm pod(s).")
+		if !*yes && !confirm("Recreate f5-tmm pod(s) to clear the ephemeral exporter?") {
+			fmt.Println("aborted.")
+			return nil
+		}
+		if err := inject.EjectEphemeral(*o); err != nil {
+			return err
+		}
+		fmt.Printf("cleared ephemeral tmm-stat-exporter from %s/%s\n", o.Namespace, o.Deployment)
+		return nil
+	}
+
 	resolved, err := pickMode(*mode, probe)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("Eject tmm-stat-exporter (%s mode) from %s/%s\n", resolved, o.Namespace, o.Deployment)
+	fmt.Printf("Eject tmm-stat-exporter (permanent / %s) from %s/%s\n", resolved, o.Namespace, o.Deployment)
 	fmt.Printf("  context:       %s\n", probe.Context)
 	fmt.Printf("  cluster (API): %s\n", probe.Server)
-	fmt.Println("  note: this rolls the f5-tmm pod(s).")
+	fmt.Println("  WARNING: this rolls (restarts) the f5-tmm pod(s).")
 	if !*yes && !confirm("Proceed?") {
 		fmt.Println("aborted.")
 		return nil
@@ -264,7 +313,7 @@ func cmdEject(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("ejected tmm-stat-exporter (%s mode) from %s/%s\n", resolved, o.Namespace, o.Deployment)
+	fmt.Printf("ejected tmm-stat-exporter (permanent / %s) from %s/%s\n", resolved, o.Namespace, o.Deployment)
 	return nil
 }
 

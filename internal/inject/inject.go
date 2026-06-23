@@ -18,6 +18,12 @@ const DefaultImage = "ghcr.io/mwiget/tmm-stat-exporter:latest"
 
 const sidecarName = "tmm-stat-exporter"
 
+// tmstatVolume is the pod volume that holds tmm's tmstat shared-memory segment
+// (/var/tmstat/blade/tmm0). tmm declares it; the exporter (sidecar or ephemeral
+// container) only mounts it read-only — it is never created by tmmscope, and its
+// presence is how we recognise a real tmm pod.
+const tmstatVolume = "f5tmstat"
+
 // Options selects the target and configures the sidecar.
 type Options struct {
 	Kubeconfig     string // --kubeconfig (empty = default resolution)
@@ -92,7 +98,7 @@ func SidecarSpec(o Options) map[string]any {
 		// and would wrongly mark the whole tmm pod NotReady. Telemetry is
 		// best-effort and must not gate tmm readiness.
 		"volumeMounts": []any{
-			map[string]any{"name": "f5tmstat", "mountPath": "/var/tmstat", "readOnly": true},
+			map[string]any{"name": tmstatVolume, "mountPath": "/var/tmstat", "readOnly": true},
 		},
 	}
 }

@@ -23,9 +23,9 @@ import (
 var composeTemplate string
 
 const (
-	projectName   = "tmmscope"
-	promContainer = "tmmscope-prometheus"
-	grafContainer = "tmmscope-grafana"
+	projectName     = "tmmscope"
+	promContainer   = "tmmscope-prometheus"
+	grafContainer   = "tmmscope-grafana"
 	remoteWritePath = "/api/v1/write"
 )
 
@@ -58,6 +58,11 @@ type UpOptions struct {
 	PrometheusPort       int
 	GrafanaPort          int
 	GrafanaAdminPassword string
+	// DockerHubMirror, when non-empty, is the host:port of a local regcachectl
+	// docker.io pull-through cache; the stack's Prometheus + Grafana images are
+	// pulled through it. Empty = a direct docker.io pull. Resolve it with
+	// ResolveDockerHubMirror.
+	DockerHubMirror string
 }
 
 // ProjectDir returns the on-disk project directory ($XDG_CONFIG_HOME/tmmscope
@@ -166,7 +171,7 @@ func Up(opts UpOptions) (*Endpoints, error) {
 		pw = "tmmscope"
 	}
 
-	if err := renderCompose(dir, promPort, grafPort, pw); err != nil {
+	if err := renderCompose(dir, promPort, grafPort, pw, opts.DockerHubMirror); err != nil {
 		return nil, err
 	}
 
@@ -233,7 +238,7 @@ func writeEndpoints(dir string, e *Endpoints) error {
 	return os.WriteFile(filepath.Join(dir, "endpoints.json"), append(b, '\n'), 0o644)
 }
 
-func renderCompose(dir string, promPort, grafPort int, adminPassword string) error {
+func renderCompose(dir string, promPort, grafPort int, adminPassword, dockerHubMirror string) error {
 	tmpl, err := template.New("compose").Parse(composeTemplate)
 	if err != nil {
 		return err
@@ -243,6 +248,7 @@ func renderCompose(dir string, promPort, grafPort int, adminPassword string) err
 		"PrometheusPort":       promPort,
 		"GrafanaPort":          grafPort,
 		"GrafanaAdminPassword": adminPassword,
+		"DockerHubPrefix":      dockerHubPrefix(dockerHubMirror),
 	}); err != nil {
 		return err
 	}

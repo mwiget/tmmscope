@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TMM Telemetry: F5 CNF Stats Aggregator and tmmscope</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 18mm 18mm;
+    @bottom-center {
+      content: "F5 CNF Stats Aggregator and tmmscope \2014 a neutral comparison";
+      font-family: "DejaVu Sans", sans-serif; font-size: 7.5pt; color: #888;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "DejaVu Sans", sans-serif; font-size: 7.5pt; color: #888;
+    }
+  }
+  html { font-family: "DejaVu Sans", "Liberation Sans", sans-serif; font-size: 9.4pt; color: #1a1a1a; line-height: 1.42; }
+  h1 { font-size: 18pt; margin: 0 0 2pt 0; color: #0b3d5c; line-height: 1.15; }
+  .subtitle { font-size: 9.5pt; color: #555; margin: 0 0 2pt 0; }
+  .meta { font-size: 8pt; color: #888; margin: 0 0 14pt 0; }
+  h2 { font-size: 11.5pt; color: #0b3d5c; margin: 16pt 0 5pt 0; padding-bottom: 2pt;
+       border-bottom: 1px solid #cfe0ea; break-after: avoid; }
+  p { margin: 4pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 5pt 0 2pt 0; font-size: 8.5pt; break-inside: auto; }
+  th, td { border: 1px solid #c9d4dc; padding: 4pt 6pt; vertical-align: top; text-align: left;
+           overflow-wrap: anywhere; word-break: break-word; }
+  th { background: #eef4f8; color: #0b3d5c; font-weight: bold; }
+  td.k { background: #f7f9fb; font-weight: bold; width: 21%; color: #333; }
+  col.c { width: 39.5%; }
+  tr { break-inside: avoid; }
+  code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8pt;
+         background: #f3f3f3; padding: 0 2px; border-radius: 2px; }
+  .lead { font-size: 9.4pt; color: #333; margin: 2pt 0 6pt 0; }
+  .callout { border: 1px solid #e3b873; background: #fdf6e8; border-left: 4px solid #d99a2b;
+             padding: 8pt 11pt; margin: 8pt 0; break-inside: avoid; }
+  .callout h3 { margin: 0 0 4pt 0; font-size: 10pt; color: #8a5a12; }
+  .callout ol { margin: 4pt 0 2pt 18pt; padding: 0; }
+  .callout li { margin: 3pt 0; }
+  .note { font-size: 8pt; color: #777; font-style: italic; margin-top: 3pt; }
+  .obs { border: 1px solid #c2d2dd; background: #f4f8fb; border-left: 4px solid #5a8fb0;
+         padding: 8pt 11pt; margin: 8pt 0; break-inside: avoid; }
+  .obs h3 { margin: 0 0 4pt 0; font-size: 10pt; color: #244c63; }
+  .obs ol { margin: 4pt 0 2pt 18pt; padding: 0; }
+  .obs li { margin: 3pt 0; }
+  ul.tight { margin: 3pt 0 3pt 16pt; padding: 0; }
+  ul.tight li { margin: 2pt 0; }
+  .pill { display: inline-block; font-size: 7.5pt; font-weight: bold; padding: 1px 5px;
+          border-radius: 8px; vertical-align: middle; }
+  .pill.f5 { background: #e7eff5; color: #0b3d5c; }
+  .pill.tm { background: #e9f3ec; color: #1f6b3a; }
+  .undoc { color: #b03030; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>TMM Telemetry Pipelines</h1>
+<p class="subtitle">F5 CNF Stats Aggregator and tmmscope &mdash; a side-by-side reference</p>
+<p class="meta">Neutral comparison &middot; 2026-06-23 &middot; both systems collect F5 TMM statistics; they make different design choices. This document states those choices factually and does not rank them. Items marked <span class="undoc">not documented</span> were not found in F5's public docs as of this date.</p>
+
+<p class="lead">Both pipelines surface TMM telemetry in Prometheus/Grafana. The
+<span class="pill f5">F5 CNF Stats Aggregator</span> is an in-cluster, operator-managed
+service that collects, persists, and aggregates TMM statistics. <span class="pill tm">tmmscope</span>
+is a self-contained CLI that injects a per-pod sidecar and pushes raw samples to a host-local
+stack. The sections below compare them across the dimensions that differ.</p>
+
+<h2>1. Architecture and components</h2>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Components</td>
+      <td>Operator/Coordinator (Deployment) + Receiver (StatefulSet) + Observer (StatefulSet) + TMM Scraper container in each TMM pod.</td>
+      <td>One sidecar container per TMM pod + a host-side <code>docker compose</code> stack (Prometheus + Grafana). No operator.</td></tr>
+  <tr><td class="k">Lifecycle</td>
+      <td>Operator orchestrates the collect/aggregate lifecycle.</td>
+      <td>CLI <code>inject</code>/<code>eject</code> (direct patch or admission webhook); re-injection is a no-op.</td></tr>
+  <tr><td class="k">Relationship</td>
+      <td>Part of the CNF stats product; runs the native observer/OTEL pipeline.</td>
+      <td>Additive &mdash; runs alongside the native pipeline, does not modify or replace it.</td></tr>
+</table>
+
+<h2>2. Collection model and data path</h2>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Collection</td>
+      <td>Pull: the Receiver requests, the in-pod TMM Scraper streams <code>tmctl</code> metrics over gRPC.</td>
+      <td>The sidecar reads the <code>tmstat</code> shared-memory segment in-pod and pushes outward.</td></tr>
+  <tr><td class="k">Path to Prometheus</td>
+      <td>Scraper &rarr; Receiver &rarr; Observer &rarr; OTEL collector; Prometheus <b>scrapes</b> the collector.</td>
+      <td>Sidecar POSTs directly to Prometheus <b>remote_write</b>; no intermediate tier.</td></tr>
+  <tr><td class="k">Storage tier</td>
+      <td>Embedded LSM time-series DB (memtables &rarr; SSTables, compaction; read/write amplification), persisted on the Receiver.</td>
+      <td>None on the producer side; samples land directly in the host Prometheus TSDB (off-cluster).</td></tr>
+</table>
+
+<h2>3. Wire protocol, format, and transport security</h2>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Direction</td><td>Prometheus pulls (scrape).</td><td>Sidecar pushes (remote_write).</td></tr>
+  <tr><td class="k">Format</td>
+      <td>Prometheus/OpenMetrics text exposition (OTLP internally between observer and collector).</td>
+      <td>Prometheus remote_write protobuf, snappy-compressed.</td></tr>
+  <tr><td class="k">Transport security</td>
+      <td>HTTPS + mTLS on the scrape; gRPC + mTLS on the internal hops. Encrypted end to end.</td>
+      <td>Plain HTTP on the data path (<code>http://&lt;host-gateway&gt;:9491/api/v1/write</code>); TLS is used only for the admission webhook (control plane).</td></tr>
+  <tr><td class="k">Bandwidth drivers</td>
+      <td>Coarser default cadence and aggregated cardinality reduce the Prometheus-facing volume; internal gRPC streams and DB compaction carry traffic that is not visible on the scrape link.</td>
+      <td>Compact per-sample encoding, but a fixed 2&nbsp;s cadence and per-pod cardinality; no internal tier behind it.</td></tr>
+</table>
+<p class="note">Absolute bandwidth depends on pod count, series cardinality, and configured intervals; no fixed figures are published for either system.</p>
+
+<h2>4. Time resolution and reporting semantics</h2>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Cadence</td>
+      <td>Per-table; default <code>default_collect_interval: 60s</code> / per-table default 1&nbsp;min. The smallest interval shown in the docs is <code>3s</code> (diagnostic example). No hard minimum is stated.</td>
+      <td>Fixed <code>TMSTAT_PUSH_INTERVAL</code>, default <code>2s</code>; single knob.</td></tr>
+  <tr><td class="k">Sampling nature</td>
+      <td>Point sample per tick.</td>
+      <td>Point sample per tick.</td></tr>
+  <tr><td class="k">Statistic per metric</td>
+      <td>By data type: monotonic counters as cumulative sums; gauges as the instantaneous value at the tick. No peak/average-over-window rollup.</td>
+      <td>Same model; counters cumulative, gauges instantaneous. CPU% is derived from cycle counters rather than TMM's pre-averaged <code>cpu_usage_*</code> fields.</td></tr>
+</table>
+<p class="note">Both are point samplers: a spike shorter than the configured tick is smoothed in either system.</p>
+
+<h2>5. Aggregation and per-TMM visibility</h2>
+<p>The systems differ in <b>where</b> cross-TMM aggregation happens, which affects how a single
+misbehaving TMM (traffic or request-rate spike) becomes visible.</p>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Where aggregation happens</td>
+      <td>At collection time, per table, in one of three modes: <b>Aggregated</b> (combine all TMMs), <b>Semi-Aggregated</b> (combine, exclude dead TMMs), <b>Diagnostic</b> (no aggregation; raw per-TMM).</td>
+      <td>Not performed by the pipeline. Every series is raw per-TMM (keyed by <code>pod</code>/<code>node</code>); aggregation is done at query time in PromQL.</td></tr>
+  <tr><td class="k">Default view</td>
+      <td>Aggregated at 60&nbsp;s &mdash; a cluster total.</td>
+      <td>Per-TMM at 2&nbsp;s &mdash; individual series.</td></tr>
+  <tr><td class="k">Seeing one TMM</td>
+      <td>Enable a <b>Diagnostic</b>-mode job for that table (multiple jobs per table are allowed, e.g. aggregated + diagnostic in parallel).</td>
+      <td>Always available; <code>sum()</code> at query time when a cluster view is wanted instead.</td></tr>
+</table>
+
+<div class="callout">
+  <h3>Diagnostic-mode caveats (F5 CNF Stats Aggregator)</h3>
+  <p>Per-TMM visibility in the aggregator is available through Diagnostic mode, subject to the following:</p>
+  <ol>
+    <li><b>Opt-in, per table, ahead of time.</b> The default is Aggregated@60s, which does not retain per-TMM detail. Aggregation occurs at ingest, so data already merged <b>cannot be de-aggregated later</b> &mdash; a Diagnostic job must be configured for the table <i>before</i> the event of interest.</li>
+    <li><b>Semi-Aggregated does not help.</b> It still merges across TMMs; only Diagnostic mode preserves per-TMM identity, so a single-TMM spike is otherwise absorbed into the combined value.</li>
+    <li><b>Added cost.</b> Diagnostic mode multiplies cardinality (per-TMM series) and is typically run at a short interval, increasing bandwidth and storage; it is usually enabled selectively rather than for every table.</li>
+    <li><b>Still point-sampled.</b> Even at a 3&nbsp;s diagnostic interval, a sub-interval burst is smoothed; the 60&nbsp;s default would not show it at all.</li>
+    <li><b>Configuration surface.</b> Modes and intervals are set per table in the operator ConfigMap (e.g. <code>jobs: [{table, mode, interval}]</code>), requiring an operator-side change to adjust visibility.</li>
+  </ol>
+  <p class="note">tmmscope does not have these caveats because it performs no ingest-time aggregation; the corresponding trade-offs on its side are the plain-HTTP data path, the off-cluster Prometheus stack, and aggregation deferred to query time.</p>
+</div>
+
+<h2>6. Resource footprint and node placement</h2>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Standing footprint</td>
+      <td>Operator + two StatefulSets + OTEL collector + mTLS certs; PersistentVolumes for the metricsdb; ongoing compaction CPU/IO.</td>
+      <td>Per-pod sidecar only: requests/limits <code>cpu 50m, memory 256Mi</code> (direct patch) or req <code>25m/32Mi</code>, limit <code>50m/64Mi</code> (webhook). No PV, no operator, no DB in-cluster.</td></tr>
+  <tr><td class="k">In-pod / on-DPU part</td>
+      <td>TMM Scraper container inside each TMM pod (on the DPU's Arm cores), replacing <code>tmstatsd</code>.</td>
+      <td>Sidecar inside each TMM pod (on the DPU's Arm cores); reads shared memory, pushes off-cluster.</td></tr>
+  <tr><td class="k">Aggregation/storage tier placement</td>
+      <td>Receiver/Observer scheduling is <span class="undoc">not documented</span> &mdash; no nodeSelector, affinity, tolerations, replica counts, or PVC sizing published. By scheduler default these land on host worker nodes, but nothing in the published config pins them off the DPU.</td>
+      <td>No such tier exists; all storage/query lives in the host-side stack, outside the cluster.</td></tr>
+</table>
+<p class="note">BIG-IP Next for Kubernetes on BlueField-3 runs one DPU per chassis; only the in-pod scraper/sidecar is on the DPU by construction. Placement of the aggregator StatefulSets is left to the installer/scheduler in the public docs.</p>
+
+<h2>7. Durability and retention</h2>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 CNF Stats Aggregator</th><th>tmmscope</th></tr>
+  <tr><td class="k">Where history lives</td>
+      <td>Persisted in the metricsdb (Receiver) and in Prometheus after scrape.</td>
+      <td>Persisted in the host Prometheus TSDB for its retention period.</td></tr>
+  <tr><td class="k">TMM restart</td>
+      <td>Aggregates can carry a terminated TMM's contribution forward (dead-pod preservation in Aggregated/Semi modes).</td>
+      <td>The restarted pod's series pauses during the gap; prior history remains; counter resets are handled by PromQL <code>rate()</code>.</td></tr>
+  <tr><td class="k">Buffering on outage</td>
+      <td>Receiver persistence buffers ahead of export.</td>
+      <td>No on-disk queue on the producer; samples during an endpoint outage are not retried.</td></tr>
+</table>
+
+<h2>8. Provided Grafana dashboards</h2>
+<p class="lead">Each project ships a Grafana dashboard. They monitor different subjects and
+share no metrics: the F5 dashboard observes the aggregator infrastructure itself, while the
+tmmscope dashboard observes TMM dataplane traffic.</p>
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Attribute</th><th>observer-dash.json (F5)</th><th>tmm-realtime.json (tmmscope)</th></tr>
+  <tr><td class="k">Title / uid</td>
+      <td>&ldquo;Observer Pods &mdash; Comprehensive Monitoring&rdquo; / <code>observer-comprehensive-v1</code></td>
+      <td>&ldquo;TMM Real-Time&rdquo; / <code>tmm-realtime</code></td></tr>
+  <tr><td class="k">Subject</td>
+      <td>Observer/aggregator pods: gRPC calls, Go runtime, metricsdb storage and aggregation.</td>
+      <td>TMM dataplane: CPU, throughput, connections, interfaces, pool members, virtual servers.</td></tr>
+  <tr><td class="k">Metric families</td>
+      <td><code>f5_grpc_*</code>, <code>go_*</code>, <code>f5_metricsdb_*</code>, <code>f5_aggregation_*</code></td>
+      <td><code>f5tmm_*</code></td></tr>
+  <tr><td class="k">Size</td>
+      <td>27 panels + 3 rows; 9 template variables; schemaVersion 42.</td>
+      <td>6 panels; 1 template variable (<code>cluster</code>); schemaVersion 39.</td></tr>
+  <tr><td class="k">Datasource wiring</td>
+      <td>Mixed across panels (see observations below).</td>
+      <td>Single pinned provisioned datasource (<code>uid: tmm-telemetry</code>) on every panel.</td></tr>
+  <tr><td class="k">Shared metrics</td>
+      <td colspan="2" style="text-align:center">None &mdash; the two dashboards cover disjoint metric sets.</td></tr>
+</table>
+
+<div class="obs">
+  <h3>Observations &mdash; observer-dash.json</h3>
+  <p>Findings a dashboard reviewer would flag, in roughly decreasing order of functional impact:</p>
+  <ol>
+    <li><b>Inconsistent datasource references.</b> Four forms coexist: most targets use
+        <code>{"uid":"$datasource"}</code> (the datasource variable); panels 4011&ndash;4014 and 4017 carry
+        <code>datasource: null</code>, which resolves to Grafana's <i>default</i> datasource rather than the
+        variable; panel 4015 is bound to the import input <code>${DS_PROMETHEUS}</code>; panels 4016/4018 use a
+        fourth spelling. As a result six panels do not follow the datasource picker.</li>
+    <li><b>Counter shown without rate().</b> Panel 4018 (&ldquo;Merged Count Rate&rdquo;) plots the
+        <code>f5_metricsdb_merged_count_total</code> counter directly in a gauge, displaying a cumulative total
+        rather than a per-second rate.</li>
+    <li><b>Unscoped template query.</b> The <code>table</code> variable uses <code>label_values(table)</code>
+        with no metric selector, enumerating that label across the entire TSDB.</li>
+    <li><b>Variable sourced from an unplotted metric.</b> The <code>method</code> variable queries
+        <code>f5_grpc_clientside_call_bytes_in_sum</code>, while every panel uses the
+        <code>*_call_duration_seconds_*</code> family.</li>
+    <li><b>Mixed rate windows.</b> The gRPC panels hardcode <code>[5m]</code>; the Go-runtime panels use
+        <code>$__rate_interval</code>.</li>
+  </ol>
+  <p class="note">Minor: trailing whitespace in one expression; panel 4013 combines a ratio (read/write
+  amplification) and a count (SSTables) on a single gauge with shared units.</p>
+</div>
+
+<p>The tmmscope dashboard (<code>tmm-realtime.json</code>) pins one provisioned datasource
+(<code>uid: tmm-telemetry</code>) across all six panels, so the datasource-consistency class of finding does
+not arise; it is a deliberately minimal, curated set driven by a single <code>cluster</code> variable. Its
+narrower scope also means it carries none of the aggregator-infrastructure panels, and vice versa &mdash;
+the two are complementary views rather than alternatives.</p>
+
+<h2>9. Metric naming and coverage</h2>
+<p class="lead">The two dashboards share no metrics, but that is a property of the dashboards, not
+the data. tmmscope reads the same <code>tmstat</code> tables that F5's metric catalog
+(<code>cnf-otel-stats</code>) is built from, so the overlap is best described at three levels:
+source, naming, and scope.</p>
+<table>
+  <colgroup><col style="width:18%"><col><col></colgroup>
+  <tr><th>Level</th><th>Overlap with F5 cnf-otel-stats</th><th>Detail</th></tr>
+  <tr><td class="k">Source data</td>
+      <td>High</td>
+      <td>tmmscope's four tables (<code>tmm_stat</code>, <code>virtual_server_stat</code>, <code>pool_member_stat</code>, <code>interface_stat</code>) are all categories in F5's catalog; same <code>tmstat</code> origin, same underlying values.</td></tr>
+  <tr><td class="k">Metric names</td>
+      <td>None</td>
+      <td>Three separate naming generations (table below); not interchangeable without relabeling.</td></tr>
+  <tr><td class="k">Coverage</td>
+      <td>Subset</td>
+      <td>tmmscope exports 4 tables (L4 traffic, connections, CPU cycles, interfaces). cnf-otel-stats spans 40+ tables (DNS, FW/NAT/CGNAT, DOS, TCP/HTTP/FTP/RTSP profiles, VLANs, ICMP, protocol inspection, &hellip;).</td></tr>
+</table>
+
+<p>What tmmscope collects is also wider than what it plots: the exporter emits every numeric column
+of each configured table as <code>f5tmm_&lt;table&gt;_&lt;column&gt;</code> (hundreds of fields), while the
+shipped dashboard surfaces about seven of them. The remaining series are present in Prometheus and
+available for additional panels.</p>
+
+<p style="margin-top:8pt"><b>Same source field, three names</b></p>
+<table>
+  <colgroup><col style="width:26%"><col style="width:25%"><col style="width:24%"><col style="width:25%"></colgroup>
+  <tr><th>tmstat source field</th><th>tmmscope</th><th>F5 v1 (raw)</th><th>F5 v2 (standardized)</th></tr>
+  <tr><td><code>virtual_server_stat</code> &middot; <code>clientside.bytes_in</code></td>
+      <td><code>f5tmm_virtual_server_clientside_bytes_in</code></td>
+      <td><code>virtual_server_stat/[name]/clientside.bytes_in</code></td>
+      <td><code>f5.virtual_server.clientside.received.bytes</code></td></tr>
+  <tr><td><code>pool_member_stat</code> &middot; <code>serverside.pkts_out</code></td>
+      <td><code>f5tmm_pool_member_serverside_pkts_out</code></td>
+      <td><code>pool_member_stat/&hellip;/serverside.pkts_out</code></td>
+      <td><code>f5.pool_member.serverside.transmitted.packets</code></td></tr>
+  <tr><td><code>tmm_stat</code> &middot; <code>tm_idle_cycles</code></td>
+      <td><code>f5tmm_tmm_tm_idle_cycles</code></td>
+      <td><code>tmm_stat/tm_idle_cycles</code></td>
+      <td>TMM core stats</td></tr>
+</table>
+<p class="note">The same source value appears in every row; only the metric string differs. tmmscope's
+<code>f5tmm_*</code> names are distinct from both the F5 v1 raw table paths and the v2 <code>f5.*</code> namespace.</p>
+
+<table>
+  <colgroup><col><col class="c"><col class="c"></colgroup>
+  <tr><th>Aspect</th><th>F5 cnf-otel-stats catalog</th><th>tmmscope</th></tr>
+  <tr><td class="k">Type metadata</td>
+      <td>OTLP semantics assigned per metric (Cumulative / Maximum / Minimum / Instance).</td>
+      <td>All series emitted as <code>gauge</code>, including monotonic counters; counter behaviour is recovered with PromQL <code>rate()</code>.</td></tr>
+  <tr><td class="k">Surface filtering</td>
+      <td>Full, unfiltered metric surface.</td>
+      <td>tmm's internal control-plane objects (leading-<code>_</code> pools/virtuals, link-local addresses) are dropped before export.</td></tr>
+</table>
+<p class="note">Net: against the dataplane catalog the two overlap substantially in substance (same four
+tmstat tables, same field values) but not in metric names (a distinct <code>f5tmm_*</code> generation) and
+not in breadth (a curated subset of a 40+ table catalog).</p>
+
+<h2>10. F5 v1 vs v2 vs tmmscope</h2>
+<p class="lead">F5 exposes TMM stats in two generations. Sections 1&ndash;7 above describe the
+<b>v2</b> (aggregated) path; <b>v1</b> is an older, non-aggregated path that is in some respects
+closer to tmmscope. The key contrast is how each reaches Prometheus.</p>
+<p><b>How v1 streams to Prometheus:</b> in v1, <code>tmstatsd</code> inside TMM streams metrics
+(OTLP) directly to the OTEL collector &mdash; <i>without aggregation</i> &mdash; and Prometheus scrapes
+that collector. v1 <b>bypasses the Receiver/Observer aggregator entirely</b>; v2 instead routes the
+in-pod TMM Scraper through Receiver&nbsp;&rarr;&nbsp;Observer (where aggregation happens) before the same
+OTEL collector. Both v1 and v2 are therefore push-to-OTEL then pull-by-Prometheus; tmmscope skips OTEL
+and pushes <code>remote_write</code> straight to Prometheus.</p>
+<table>
+  <colgroup><col style="width:16%"><col style="width:28%"><col style="width:28%"><col style="width:28%"></colgroup>
+  <tr><th>Aspect</th><th>F5 v1 (raw)</th><th>F5 v2 (aggregated)</th><th>tmmscope</th></tr>
+  <tr><td class="k">Collection from TMM</td>
+      <td><code>tmstatsd</code> streams from TMM.</td>
+      <td>In-pod TMM Scraper (replaces <code>tmstatsd</code>) streams <code>tmctl</code> to the Receiver on request, gRPC + mTLS.</td>
+      <td>Sidecar reads the <code>tmstat</code> shared-memory segment in-pod.</td></tr>
+  <tr><td class="k">Collection cadence (per TMM)</td>
+      <td>Not stated in the docs; <code>tmstatsd</code> streams from each TMM periodically.</td>
+      <td>Per-table; default <code>60s</code>, as low as <code>3s</code> shown (no hard minimum). Applied before/at aggregation.</td>
+      <td>Fixed <code>2s</code> push interval, identical for every TMM.</td></tr>
+  <tr><td class="k">Aggregation tier</td>
+      <td>None &mdash; bypasses Receiver/Observer.</td>
+      <td>Receiver + Observer StatefulSets.</td>
+      <td>None.</td></tr>
+  <tr><td class="k">Aggregation</td>
+      <td>None; raw per-TMM.</td>
+      <td>Aggregated / Semi-Aggregated / Diagnostic (per table).</td>
+      <td>None; aggregation done at query time in PromQL.</td></tr>
+  <tr><td class="k">Path to Prometheus</td>
+      <td><code>tmstatsd</code> &rarr; OTEL collector &rarr; Prometheus scrape.</td>
+      <td>Scraper &rarr; Receiver &rarr; Observer &rarr; OTEL collector &rarr; Prometheus scrape.</td>
+      <td>Sidecar &rarr; <code>remote_write</code> &rarr; Prometheus (no OTEL).</td></tr>
+  <tr><td class="k">Prometheus ingestion</td>
+      <td>Pull (scrape of the OTEL collector).</td>
+      <td>Pull (scrape of the OTEL collector).</td>
+      <td>Push (<code>remote_write</code>).</td></tr>
+  <tr><td class="k">Transport security</td>
+      <td>HTTPS + mTLS scrape of the OTEL collector.</td>
+      <td>HTTPS + mTLS scrape; gRPC + mTLS on the internal hops.</td>
+      <td>Plain HTTP on the data path.</td></tr>
+  <tr><td class="k">Metric naming</td>
+      <td>Raw table-based, e.g. <code>virtual_server_stat/[name]/clientside.bytes_out</code>.</td>
+      <td>Standardized fixed names, e.g. <code>f5.virtual_server.clientside.received.bytes</code>.</td>
+      <td><code>f5tmm_&lt;table&gt;_&lt;column&gt;</code>, e.g. <code>f5tmm_virtual_server_clientside_bytes_out</code>.</td></tr>
+  <tr><td class="k">Identity labels</td>
+      <td><code>host.name</code>, <code>tmmID</code> (per-TMM instance).</td>
+      <td><code>namespace</code>, target namespace, <code>observer.job.mode</code> (aggregation state).</td>
+      <td><code>pod</code> / <code>node</code> + the table's key columns.</td></tr>
+  <tr><td class="k">Per-TMM granularity</td>
+      <td>Always (raw per-TMM).</td>
+      <td>Only in Diagnostic mode; otherwise merged.</td>
+      <td>Always.</td></tr>
+</table>
+<p class="note">In granularity and the absence of an aggregation tier, v1 is the closest F5 analog to
+tmmscope; they differ mainly in the egress (v1 goes through OTEL and is scraped over mTLS; tmmscope pushes
+<code>remote_write</code> over plain HTTP) and in naming. v2 adds the aggregation tier and standardized
+<code>f5.*</code> names on top of the same TMM source data. The page does not restate the Prometheus scrape
+step for v1 specifically, but the OTEL collector is the documented Prometheus integration point for both
+generations.</p>
+
+<h2>Summary</h2>
+<p>The two pipelines occupy different points on the same design space. The F5 CNF Stats
+Aggregator centralizes collection, persistence, aggregation, and mTLS in an operator-managed
+in-cluster service, and exposes per-TMM detail through opt-in Diagnostic mode. tmmscope keeps a
+small per-pod sidecar, defers storage and aggregation to an off-cluster Prometheus/Grafana stack,
+and presents per-TMM series by default over a plain-HTTP push. The right fit depends on whether
+ingest-time aggregation and durability or always-on per-pod granularity and a minimal in-cluster
+footprint matter more for a given deployment.</p>
+
+</body>
+</html>
