@@ -56,6 +56,14 @@ linking client-go — keep it that way unless there's a strong reason.
 - The sidecar spec in `internal/inject` is intentionally identical to the one
   `tmmlitectl` injects today, so `tmmscope inject` is a drop-in replacement
   (re-injecting an already-instrumented cluster is a no-op).
+- **Two injection axes, kept orthogonal.** *Permanence*: ephemeral (default —
+  `ephemeral.go`, adds an ephemeral container to each live pod via the
+  `pods/ephemeralcontainers` subresource, **no tmm restart**, but transient) vs
+  `--permanent` (a durable sidecar that **rolls the pods**). *Targeting* (only for
+  `--permanent`): patch vs webhook, auto-detected by ownerReferences. The
+  ephemeral spec is `SidecarSpec` minus `resources` (the subresource rejects it);
+  keep the two specs in sync. A pod is recognised as real tmm by the presence of
+  the `f5tmstat` volume — tmmscope never creates it.
 
 ## Roadmap
 
@@ -64,5 +72,6 @@ linking client-go — keep it that way unless there's a strong reason.
 3. `inject`/`eject` direct-patch — **done**
 4. `inject` admission-webhook path for operator-managed FLO/BNK pods — **done**
    (auto-detected via ownerReferences; self-signed cert, no cert-manager)
+4b. Ephemeral injection (default; no tmm restart) + `--permanent` opt-in — **done**
 5. `tmmlitectl` / `ocibnkctl` discover tmmscope (and optionally drop their own
    injection in favor of `tmmscope inject`) — **planned, decision deferred**

@@ -140,19 +140,35 @@ tmmscope host's architecture is irrelevant** — an Apple-Silicon laptop can sco
 an amd64 cluster and vice versa.
 
 ```bash
-# default: pull the multi-arch image from ghcr, auto-derive the remote_write URL
+# default: ephemeral container, no tmm restart; auto-derive the remote_write URL
 tmmscope inject --context calico
+
+# durable sidecar instead (warns first — this restarts the f5-tmm pod[s])
+tmmscope inject --context calico --permanent
 
 # explicit target / endpoint / label
 tmmscope inject --kubeconfig ./kubeconfig --namespace default \
   --deployment f5-tmm --cluster calico \
   --remote-write-url http://192.168.98.1:9491/api/v1/write
 
-tmmscope eject --context calico
+tmmscope eject --context calico              # clear the ephemeral injection
+tmmscope eject --context calico --permanent  # remove a durable sidecar
 ```
 
-`tmmscope inject` **auto-detects** the cluster shape (override with
-`--mode auto|patch|webhook`):
+**Ephemeral by default — no tmm restart.** `tmmscope inject` adds the exporter as
+an *ephemeral container* to each running `f5-tmm` pod (via the
+`pods/ephemeralcontainers` subresource — the mechanism behind `kubectl debug`),
+so tmm keeps running. This works the same on standalone and operator-managed
+clusters and the operator won't reconcile it away. The catch: ephemeral
+containers are **transient** — they don't survive a pod restart and aren't
+re-added automatically, and they run without a cpu/memory limit (the subresource
+rejects `resources`). Ideal for ad-hoc, real-time scoping. `tmmscope eject`
+recreates the pod(s) to clear it (the only way to remove an ephemeral container).
+
+**`--permanent` — a durable sidecar (restarts tmm).** Pass `--permanent` for a
+sidecar baked into the workload that survives restarts. This **rolls (restarts)
+the f5-tmm pod(s)**, and you're warned before it does. Permanent injection
+auto-detects the cluster shape (override with `--mode auto|patch|webhook`):
 
 - **Direct patch** — for a plain `f5-tmm` Deployment (e.g. `tmmlitectl`
   clusters): a strategic-merge patch adds the sidecar container.
@@ -160,7 +176,7 @@ tmmscope eject --context calico
   Deployment is owned by the `F5Tmm` CR, so a direct patch is reconciled away):
   tmmscope deploys a mutating webhook with a self-signed serving cert (no
   cert-manager dependency) that injects the sidecar at pod admission, then rolls
-  the tmm pods. `tmmscope eject` tears the webhook back down.
+  the tmm pods. `tmmscope eject --permanent` tears the webhook back down.
 
 For an operator-managed cluster without a bnk-edge `net1` interface (so the URL
 can't be auto-derived), pass `--remote-write-url` pointing at the node's docker
