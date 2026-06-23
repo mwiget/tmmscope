@@ -320,6 +320,10 @@ and pushes <code>remote_write</code> straight to Prometheus.</p>
       <td><code>tmstatsd</code> streams from TMM.</td>
       <td>In-pod TMM Scraper (replaces <code>tmstatsd</code>) streams <code>tmctl</code> to the Receiver on request, gRPC + mTLS.</td>
       <td>Sidecar reads the <code>tmstat</code> shared-memory segment in-pod.</td></tr>
+  <tr><td class="k">Collection cadence (per TMM)</td>
+      <td>Not stated in the docs; <code>tmstatsd</code> streams from each TMM periodically.</td>
+      <td>Per-table; default <code>60s</code>, as low as <code>3s</code> shown (no hard minimum). Applied before/at aggregation.</td>
+      <td>Fixed <code>2s</code> push interval, identical for every TMM.</td></tr>
   <tr><td class="k">Aggregation tier</td>
       <td>None &mdash; bypasses Receiver/Observer.</td>
       <td>Receiver + Observer StatefulSets.</td>
