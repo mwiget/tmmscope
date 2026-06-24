@@ -1,0 +1,401 @@
+{
+  "id": null,
+  "uid": "tmm-ai-tokens",
+  "title": "TMM AI Token Usage",
+  "tags": [
+    "tmm",
+    "telemetry",
+    "ai",
+    "tokens"
+  ],
+  "description": "AI token usage per LB (virtual server), from the tmm-stat-exporter f5tmm_token_* gauges (an iRule maintains cumulative prompt/completion/total counters in DSSM/Redis via the `table` command; the exporter scans them). This dashboard is an example template for a production Prometheus/Grafana: it uses idiomatic rate()/increase() over the lifetime cumulative counters, so the per-hour..per-year tiles need a Prometheus retention >= the longest window (tmmscope's own receiver keeps only 24h, so the 7d/30d/365d tiles read low there).",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "cluster",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "tmm-telemetry"
+        },
+        "query": {
+          "query": "label_values(f5tmm_up, cluster)",
+          "refId": "var"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {}
+      },
+      {
+        "name": "vs",
+        "label": "LB (virtual server)",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "tmm-telemetry"
+        },
+        "query": {
+          "query": "label_values(f5tmm_token_total{cluster=\"$cluster\"}, vs)",
+          "refId": "var"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total token rate (tok/s)",
+      "description": "Aggregate token throughput across the selected LBs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tmm-telemetry"
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(rate(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Token rate per LB — stacked (tok/s)",
+      "description": "Per-LB token rate; the stack height is the total token rate.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tmm-telemetry"
+      },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum by (vs) (rate(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))",
+          "legendFormat": "{{vs}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Prompt vs completion rate — stacked (tok/s)",
+      "description": "Split of input (prompt) vs output (completion) token rate across the selected LBs.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tmm-telemetry"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(rate(f5tmm_token_prompt{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))",
+          "legendFormat": "prompt (input)"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(rate(f5tmm_token_completion{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))",
+          "legendFormat": "completion (output)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Cumulative tokens per LB (total)",
+      "description": "The raw lifetime counter per LB — monotonic, persisted in DSSM/Redis (survives tmm restarts). rate()/increase() over this drive every other panel.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "tmm-telemetry"
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum by (vs) (f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"})",
+          "legendFormat": "{{vs}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Tokens · last 1h",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "blue" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[1h]))"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Tokens · last 24h",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "blue" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[24h]))"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Tokens · last 7d",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "purple" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[7d]))"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Tokens · last 30d",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "purple" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[30d]))"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Tokens · last 365d",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "red" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[365d]))"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "Tokens · selected range",
+      "description": "Tokens consumed over the dashboard's current time range.",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "orange" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid", "graphMode": "none", "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Tokens per LB — selected range",
+      "description": "Total / prompt / completion tokens per LB over the dashboard time range.",
+      "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 21 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "align": "auto", "filterable": true } },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [ { "displayName": "total", "desc": true } ]
+      },
+      "targets": [
+        {
+          "refId": "total",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum by (vs) (increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "prompt",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum by (vs) (increase(f5tmm_token_prompt{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "completion",
+          "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
+          "expr": "sum by (vs) (increase(f5tmm_token_completion{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "vs": "LB (virtual server)",
+              "Value #total": "total",
+              "Value #prompt": "prompt",
+              "Value #completion": "completion"
+            },
+            "indexByName": {
+              "vs": 0,
+              "Value #total": 1,
+              "Value #prompt": 2,
+              "Value #completion": 3
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
