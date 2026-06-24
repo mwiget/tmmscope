@@ -54,6 +54,25 @@
         "allValue": ".*",
         "multi": true,
         "current": {}
+      },
+      {
+        "name": "mode",
+        "label": "Mode",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "tmm-telemetry"
+        },
+        "query": {
+          "query": "label_values(f5tmm_token_total{cluster=\"$cluster\"}, mode)",
+          "refId": "var"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": {}
       }
     ]
   },
@@ -87,7 +106,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(rate(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))"
+          "expr": "sum(rate(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__rate_interval]))"
         }
       ]
     },
@@ -121,8 +140,8 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum by (vs) (rate(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))",
-          "legendFormat": "{{vs}}"
+          "expr": "sum by (vs, mode) (rate(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__rate_interval]))",
+          "legendFormat": "{{vs}} ({{mode}})"
         }
       ]
     },
@@ -156,13 +175,13 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(rate(f5tmm_token_prompt{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))",
+          "expr": "sum(rate(f5tmm_token_prompt{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__rate_interval]))",
           "legendFormat": "prompt (input)"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(rate(f5tmm_token_completion{cluster=\"$cluster\", vs=~\"$vs\"}[$__rate_interval]))",
+          "expr": "sum(rate(f5tmm_token_completion{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__rate_interval]))",
           "legendFormat": "completion (output)"
         }
       ]
@@ -196,8 +215,8 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum by (vs) (f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"})",
-          "legendFormat": "{{vs}}"
+          "expr": "sum by (vs, mode) (f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"})",
+          "legendFormat": "{{vs}} ({{mode}})"
         }
       ]
     },
@@ -219,7 +238,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[1h]))"
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[1h]))"
         }
       ]
     },
@@ -241,7 +260,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[24h]))"
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[24h]))"
         }
       ]
     },
@@ -263,7 +282,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[7d]))"
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[7d]))"
         }
       ]
     },
@@ -285,7 +304,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[30d]))"
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[30d]))"
         }
       ]
     },
@@ -307,7 +326,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[365d]))"
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[365d]))"
         }
       ]
     },
@@ -330,7 +349,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))"
+          "expr": "sum(increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__range]))"
         }
       ]
     },
@@ -353,21 +372,21 @@
         {
           "refId": "total",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum by (vs) (increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))",
+          "expr": "sum by (vs, mode) (increase(f5tmm_token_total{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__range]))",
           "format": "table",
           "instant": true
         },
         {
           "refId": "prompt",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum by (vs) (increase(f5tmm_token_prompt{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))",
+          "expr": "sum by (vs, mode) (increase(f5tmm_token_prompt{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__range]))",
           "format": "table",
           "instant": true
         },
         {
           "refId": "completion",
           "datasource": { "type": "prometheus", "uid": "tmm-telemetry" },
-          "expr": "sum by (vs) (increase(f5tmm_token_completion{cluster=\"$cluster\", vs=~\"$vs\"}[$__range]))",
+          "expr": "sum by (vs, mode) (increase(f5tmm_token_completion{cluster=\"$cluster\", vs=~\"$vs\", mode=~\"$mode\"}[$__range]))",
           "format": "table",
           "instant": true
         }
@@ -383,15 +402,17 @@
             "excludeByName": { "Time": true },
             "renameByName": {
               "vs": "LB (virtual server)",
+              "mode": "mode",
               "Value #total": "total",
               "Value #prompt": "prompt",
               "Value #completion": "completion"
             },
             "indexByName": {
               "vs": 0,
-              "Value #total": 1,
-              "Value #prompt": 2,
-              "Value #completion": 3
+              "mode": 1,
+              "Value #total": 2,
+              "Value #prompt": 3,
+              "Value #completion": 4
             }
           }
         }
