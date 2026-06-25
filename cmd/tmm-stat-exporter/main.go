@@ -31,10 +31,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mwiget/tmmscope/internal/tmstat"
@@ -47,6 +51,12 @@ func main() {
 	remoteWrite := flag.String("remote-write", os.Getenv("TMSTAT_REMOTE_WRITE_URL"), "Prometheus remote_write URL to push to (empty = serve /metrics only)")
 	interval := flag.Duration("interval", envDuration("TMSTAT_PUSH_INTERVAL", 2*time.Second), "remote_write push interval")
 	extLabels := flag.String("labels", os.Getenv("TMSTAT_EXTERNAL_LABELS"), "extra label set added to every series, comma-separated k=v (e.g. cluster=calico)")
+	dssmAddr := flag.String("dssm-addr", envOr("TMMTOK_DSSM_ADDR", "f5-dssm-db:6379"), "DSSM Redis address for iRule `table` token counters (auto-detected: no-op unless reachable and the subtable exists)")
+	dssmCertDir := flag.String("dssm-cert-dir", envOr("TMMTOK_DSSM_CERT_DIR", "/tls/tmm/mds/clt"), "dir with tls.crt/tls.key/ca.crt for DSSM mTLS (empty or missing = token export disabled)")
+	dssmServerName := flag.String("dssm-server-name", envOr("TMMTOK_DSSM_SERVER_NAME", "dssm-svc"), "TLS server name DSSM presents")
+	dssmSubtable := flag.String("dssm-subtable", envOr("TMMTOK_DSSM_SUBTABLE", "TMMTOK"), "iRule `table` subtable marker holding the token counters")
+	dssmDB := flag.Int("dssm-db", envInt("TMMTOK_DSSM_DB", 0), "DSSM Redis logical DB to scan")
+	once := flag.Bool("once", false, "collect a single snapshot, print the /metrics text to stdout, and exit (debug)")
 	flag.Parse()
 
 	e := &exporter{
@@ -55,6 +65,20 @@ func main() {
 		extra:    parseLabels(*extLabels),
 		rwURL:    *remoteWrite,
 		interval: *interval,
+		dssm: dssmConfig{
+			addr:       *dssmAddr,
+			certDir:    *dssmCertDir,
+			serverName: *dssmServerName,
+			subtable:   *dssmSubtable,
+			db:         *dssmDB,
+		},
+	}
+
+	if *once {
+		rec := httptest.NewRecorder()
+		e.handleMetrics(rec, nil)
+		fmt.Print(rec.Body.String())
+		return
 	}
 
 	http.HandleFunc("/metrics", e.handleMetrics)
@@ -81,6 +105,32 @@ type exporter struct {
 	extra    []label // external labels added to every series
 	rwURL    string
 	interval time.Duration
+	dssm     dssmConfig
+
+	mu          sync.Mutex
+	dssmLastErr string // last DSSM dial/scan error, for transition-only logging
+}
+
+// dssmConfig points the token collector at the DSSM Redis holding the iRule
+// `table` counters. It is entirely opt-in/auto-detecting: if certDir is unset
+// or absent, or Redis is unreachable, or the subtable has no keys, the
+// collector simply contributes no samples — it never fails the tmstat path.
+type dssmConfig struct {
+	addr       string
+	certDir    string
+	serverName string
+	subtable   string
+	db         int
+}
+
+// enabled reports whether the DSSM client cert is present. Absent cert dir =
+// this deployment has no token iRule wired, so token export stays off.
+func (d dssmConfig) enabled() bool {
+	if d.addr == "" || d.certDir == "" || d.subtable == "" {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(d.certDir, "tls.crt"))
+	return err == nil
 }
 
 // sample is one metric data point: a fully-qualified metric name, its key
@@ -89,6 +139,10 @@ type sample struct {
 	metric string
 	labels []label
 	value  float64
+	// global marks a cluster-shared series (the DSSM token counters): its
+	// per-instance external labels (pod, node) are dropped at remote_write so
+	// every pod's exporter reports the one shared counter as a single series.
+	global bool
 }
 
 type label struct{ name, value string }
@@ -150,7 +204,135 @@ func (e *exporter) collect() ([]sample, error) {
 			}
 		}
 	}
+	// Best-effort: append iRule token counters from DSSM/Redis when present.
+	// Never fails the tmstat collect — token errors only suppress token samples.
+	out = append(out, e.collectTokens()...)
 	return out, nil
+}
+
+// tokenValueRe extracts the integer a `table incr` counter holds inside the
+// DSSM record envelope. The value is stored as `V001…S<zero-padded-decimal>`
+// (e.g. `V0010005000000b4…S00065` → 65); non-counter entries (e.g. the
+// subtable's set markers) lack a trailing S<digits> and are skipped.
+var tokenValueRe = regexp.MustCompile(`S([0-9]+)$`)
+
+// collectTokens reads the iRule `table` token counters out of DSSM/Redis and
+// returns them as f5tmm_token_<suffix> gauges. It is fully auto-detecting:
+// returns nil (no error surfaced) when DSSM is disabled, unreachable, or the
+// subtable is empty — so a cluster without the token-counting iRule emits
+// nothing extra.
+//
+// The iRule stores each counter in a subtable named <subtable> (the marker),
+// with member key `<suffix>|<lbl>=<val>|<lbl>=<val>…`. DSSM concatenates that
+// into a Redis key `<prefix><hash><subtable><member>`; we strip up to and
+// including the marker to recover the member, then split it into a metric
+// suffix and labels.
+func (e *exporter) collectTokens() []sample {
+	if !e.dssm.enabled() {
+		return nil
+	}
+	c, err := dialRedis(e.dssm.addr, e.dssm.certDir, e.dssm.serverName, e.dssm.db, 5*time.Second)
+	if err != nil {
+		e.dssmError("dial: " + err.Error())
+		return nil
+	}
+	defer c.Close()
+
+	keys, err := c.scanMatch("*"+e.dssm.subtable+"*", 200)
+	if err != nil {
+		e.dssmError("scan: " + err.Error())
+		return nil
+	}
+	var out []sample
+	for _, key := range keys {
+		idx := strings.Index(key, e.dssm.subtable)
+		if idx < 0 {
+			continue
+		}
+		member := key[idx+len(e.dssm.subtable):]
+		if member == "" {
+			continue // the subtable index list key
+		}
+		raw, ok := c.get(key)
+		if !ok {
+			continue // missing or wrong-type (the index list)
+		}
+		m := tokenValueRe.FindStringSubmatch(raw)
+		if m == nil {
+			continue // not a numeric counter
+		}
+		val, err := strconv.ParseFloat(m[1], 64)
+		if err != nil {
+			continue
+		}
+		suffix, lbls := parseTokenMember(member)
+		if suffix == "" {
+			continue
+		}
+		out = append(out, sample{metric: "f5tmm_token_" + sanitize(suffix), labels: lbls, value: val, global: true})
+	}
+	// Stable order so the text emitter groups each family under one TYPE line.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].metric != out[j].metric {
+			return out[i].metric < out[j].metric
+		}
+		return labelKey(out[i].labels) < labelKey(out[j].labels)
+	})
+	if len(out) > 0 {
+		e.clearDSSMError()
+	}
+	return out
+}
+
+// parseTokenMember splits an iRule member key `suffix|k=v|k=v` into the metric
+// suffix and its sanitized labels. Pairs without '=' are ignored.
+func parseTokenMember(member string) (string, []label) {
+	parts := strings.Split(member, "|")
+	suffix := parts[0]
+	var lbls []label
+	for _, p := range parts[1:] {
+		k, v, ok := strings.Cut(p, "=")
+		if !ok || k == "" {
+			continue
+		}
+		lbls = append(lbls, label{sanitize(k), v})
+	}
+	return suffix, lbls
+}
+
+func labelKey(lbls []label) string {
+	var b strings.Builder
+	for _, l := range lbls {
+		b.WriteString(l.name)
+		b.WriteByte('=')
+		b.WriteString(l.value)
+		b.WriteByte(',')
+	}
+	return b.String()
+}
+
+// dssmError logs a DSSM read failure only on transition (when the error first
+// appears or its text changes), not every scrape — so a cluster where DSSM
+// isn't deployed (or the token iRule isn't wired) logs at most one line, not a
+// stream every push interval.
+func (e *exporter) dssmError(msg string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if msg != e.dssmLastErr {
+		log.Printf("dssm token export disabled: %s", msg)
+		e.dssmLastErr = msg
+	}
+}
+
+// clearDSSMError records recovery: if we were in an error state, log that token
+// export resumed, then reset so the next outage logs again.
+func (e *exporter) clearDSSMError() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.dssmLastErr != "" {
+		log.Printf("dssm token export: recovered, exporting token counters")
+		e.dssmLastErr = ""
+	}
 }
 
 // dropInternal removes rows that belong to tmm's own control plane rather than
@@ -356,6 +538,15 @@ func envDuration(key string, def time.Duration) time.Duration {
 	if v := os.Getenv(key); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			return d
+		}
+	}
+	return def
+}
+
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
 		}
 	}
 	return def

@@ -22,11 +22,21 @@ import (
 // plus the external labels and the sample's key labels. Label sets are sorted by
 // name (remote_write requires sorted, unique label names).
 func buildWriteRequest(samples []sample, extra []label, tsMillis int64) []byte {
+	// Per-instance external labels (pod, node) are dropped from global samples:
+	// the DSSM token counters are a single cluster-shared value every tmm pod's
+	// exporter reads identically, so tagging them per-pod would split one series
+	// into N duplicates. Global samples keep only cluster-scoped labels.
+	globalExtra := dropPerInstance(extra)
+
 	var req []byte
 	for _, s := range samples {
-		labels := make([]label, 0, len(s.labels)+len(extra)+1)
+		ex := extra
+		if s.global {
+			ex = globalExtra
+		}
+		labels := make([]label, 0, len(s.labels)+len(ex)+1)
 		labels = append(labels, label{"__name__", s.metric})
-		labels = append(labels, extra...)
+		labels = append(labels, ex...)
 		labels = append(labels, s.labels...)
 		sort.Slice(labels, func(i, j int) bool { return labels[i].name < labels[j].name })
 
@@ -39,6 +49,19 @@ func buildWriteRequest(samples []sample, extra []label, tsMillis int64) []byte {
 		req = appendBytesField(req, 1, ts) // WriteRequest.timeseries = 1
 	}
 	return snappy.Encode(nil, req)
+}
+
+// dropPerInstance returns the external labels minus the per-instance ones
+// (pod, node), for cluster-shared global series.
+func dropPerInstance(extra []label) []label {
+	out := make([]label, 0, len(extra))
+	for _, l := range extra {
+		if l.name == "pod" || l.name == "node" {
+			continue
+		}
+		out = append(out, l)
+	}
+	return out
 }
 
 func encodeLabel(l label) []byte {
