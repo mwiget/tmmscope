@@ -26,6 +26,15 @@ func buildWriteRequest(samples []sample, extra []label, tsMillis int64) []byte {
 	// the DSSM token counters are a single cluster-shared value every tmm pod's
 	// exporter reads identically, so tagging them per-pod would split one series
 	// into N duplicates. Global samples keep only cluster-scoped labels.
+	//
+	// CAVEAT (multi-tmm): because the label set is identical across pods, on a
+	// cluster with N>1 tmm pods all N exporters push the SAME global series every
+	// interval at offset times, so the remote_write receiver logs "out of order
+	// sample" and drops the later-arriving duplicate. This is benign — every pod
+	// reads the same DSSM counter and pushes the same value, so the accepted
+	// samples still form a correct series — just noisy. A clean fix would be
+	// single-writer token export (lease/leader) or a per-pod label with the
+	// dashboard using max by(...) instead of sum.
 	globalExtra := dropPerInstance(extra)
 
 	var req []byte
