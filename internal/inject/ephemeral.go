@@ -101,6 +101,10 @@ func (o Options) injectEphemeralInto(pod string) (bool, error) {
 	if !hasNamed(spec["volumes"], tmstatVolume) {
 		return false, fmt.Errorf("pod has no %q volume; not an f5-tmm pod", tmstatVolume)
 	}
+	// Mount tmm's DSSM client cert when this pod has it, so the exporter can read
+	// the iRule token counters out of DSSM/Redis. Detected per-pod so a cluster
+	// without DSSM never gets a mount referencing a missing volume.
+	o.DSSMCert = hasNamed(spec["volumes"], DSSMCertVolume)
 
 	list, _ := spec["ephemeralContainers"].([]any)
 	spec["ephemeralContainers"] = append(list, EphemeralSidecarSpec(o))

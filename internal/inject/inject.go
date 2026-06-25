@@ -24,6 +24,18 @@ const sidecarName = "tmm-stat-exporter"
 // presence is how we recognise a real tmm pod.
 const tmstatVolume = "f5tmstat"
 
+// DSSMCertVolume is tmm's DSSM (Redis) mTLS *client* cert volume, mounted in the
+// tmm container at DSSMCertMount. When a tmm pod has it, the exporter mounts it
+// too so it can read the iRule `table` token counters out of DSSM/Redis and emit
+// the f5tmm_token_* series. Absent on clusters without DSSM — then token export
+// simply stays off (the exporter no-ops when the cert dir has no tls.crt).
+const DSSMCertVolume = "tls-tmm-mds-clt-volume"
+
+// DSSMCertMount is where the exporter expects the DSSM client cert
+// (tls.crt/tls.key/ca.crt) — matches the exporter's TMMTOK_DSSM_CERT_DIR default,
+// so mounting the volume here is all that's needed to enable token export.
+const DSSMCertMount = "/tls/tmm/mds/clt"
+
 // Options selects the target and configures the sidecar.
 type Options struct {
 	Kubeconfig     string // --kubeconfig (empty = default resolution)
@@ -35,12 +47,19 @@ type Options struct {
 	RemoteWriteURL string // full remote_write URL; empty = auto-derive
 	Image          string // exporter image
 	WebhookImage   string // webhook image (webhook mode only)
+	// DSSMCert, when true, mounts the DSSM client cert volume (DSSMCertVolume)
+	// into the exporter at DSSMCertMount, enabling iRule token-counter export.
+	// Set per-target by detecting the volume on the tmm pod/template.
+	DSSMCert bool
 }
 
 // Inject patches the Deployment to add the sidecar. It is idempotent: a
 // strategic merge on the container list (merge key "name") updates an existing
 // sidecar rather than duplicating it.
 func Inject(o Options) error {
+	// Mount tmm's DSSM client cert when the template declares it, so the exporter
+	// can read the iRule token counters out of DSSM/Redis.
+	o.DSSMCert = o.hasTemplateVolume(DSSMCertVolume)
 	patch := map[string]any{
 		"spec": map[string]any{
 			"template": map[string]any{
@@ -97,10 +116,63 @@ func SidecarSpec(o Options) map[string]any {
 		// interfaces, so a kubelet probe to the pod IP can't reach the sidecar
 		// and would wrongly mark the whole tmm pod NotReady. Telemetry is
 		// best-effort and must not gate tmm readiness.
-		"volumeMounts": []any{
-			map[string]any{"name": tmstatVolume, "mountPath": "/var/tmstat", "readOnly": true},
-		},
+		"volumeMounts": sidecarMounts(o),
 	}
+}
+
+// sidecarMounts is the exporter's volume mounts: always the read-only tmstat
+// segment, plus tmm's DSSM client cert when the target has it (so the exporter
+// can read the iRule `table` token counters out of DSSM/Redis). The exporter's
+// TMMTOK_DSSM_CERT_DIR defaults to DSSMCertMount, so the mount alone enables it.
+func sidecarMounts(o Options) []any {
+	mounts := []any{
+		map[string]any{"name": tmstatVolume, "mountPath": "/var/tmstat", "readOnly": true},
+	}
+	if o.DSSMCert {
+		mounts = append(mounts, map[string]any{"name": DSSMCertVolume, "mountPath": DSSMCertMount, "readOnly": true})
+	}
+	return mounts
+}
+
+// hasTemplateVolume reports whether the target Deployment/DaemonSet pod template
+// declares a volume named vol.
+func (o Options) hasTemplateVolume(vol string) bool {
+	kind := o.ResourceKind
+	if kind == "" {
+		kind = "deployment"
+	}
+	out, err := exec.Command("kubectl", o.kubectlArgs("get", kind, o.Deployment,
+		"-o", "jsonpath={.spec.template.spec.volumes[*].name}")...).Output()
+	if err != nil {
+		return false
+	}
+	for _, f := range strings.Fields(string(out)) {
+		if f == vol {
+			return true
+		}
+	}
+	return false
+}
+
+// DSSMAvailable reports whether the target carries tmm's DSSM client cert volume
+// (so token export will be enabled on injection). Checks live pods first, then
+// the controller template — used by the CLI to show whether tokens will flow.
+func DSSMAvailable(o Options) bool {
+	if pods, err := o.targetPodNames(); err == nil {
+		for _, pod := range pods {
+			out, err := exec.Command("kubectl", o.kubectlArgs("get", "pod", pod,
+				"-o", "jsonpath={.spec.volumes[*].name}")...).Output()
+			if err != nil {
+				continue
+			}
+			for _, f := range strings.Fields(string(out)) {
+				if f == DSSMCertVolume {
+					return true
+				}
+			}
+		}
+	}
+	return o.hasTemplateVolume(DSSMCertVolume)
 }
 
 func downward(name, path string) map[string]any {

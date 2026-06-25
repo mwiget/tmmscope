@@ -116,16 +116,24 @@ func (m *mutator) patchFor(raw json.RawMessage) []byte {
 		}
 	}
 	hasVol := false
+	hasDSSM := false
 	for _, v := range pod.Spec.Volumes {
 		if v.Name == tmstatVolume {
 			hasVol = true
-			break
+		}
+		if v.Name == inject.DSSMCertVolume {
+			hasDSSM = true
 		}
 	}
 	if !hasVol {
 		return nil // not a tmm pod (no shared tmstat segment to read)
 	}
-	patch, err := json.Marshal([]patchOp{{Op: "add", Path: "/spec/containers/-", Value: inject.SidecarSpec(m.opts)}})
+	// Mount tmm's DSSM client cert when the pod carries it, so the exporter reads
+	// the iRule token counters out of DSSM/Redis. opts is copied so this is
+	// per-pod (a pod without DSSM gets no mount referencing a missing volume).
+	opts := m.opts
+	opts.DSSMCert = hasDSSM
+	patch, err := json.Marshal([]patchOp{{Op: "add", Path: "/spec/containers/-", Value: inject.SidecarSpec(opts)}})
 	if err != nil {
 		return nil
 	}

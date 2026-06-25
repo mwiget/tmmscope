@@ -216,6 +216,11 @@ func cmdInject(args []string) error {
 	fmt.Printf("  exporter:      %s\n", o.Image)
 	fmt.Printf("  stream label:  cluster=%s\n", o.Cluster)
 	fmt.Printf("  remote_write:  %s\n", o.RemoteWriteURL)
+	if inject.DSSMAvailable(*o) {
+		fmt.Printf("  token export:  enabled (DSSM cert → %s) — f5tmm_token_* from the iRule table\n", inject.DSSMCertMount)
+	} else {
+		fmt.Printf("  token export:  disabled (no DSSM client cert on tmm)\n")
+	}
 
 	if !*permanent {
 		// Default: ephemeral container on each live pod — tmm keeps running.
