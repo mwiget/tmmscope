@@ -46,8 +46,15 @@ import (
 
 func main() {
 	listen := flag.String("listen", envOr("TMSTAT_LISTEN", ":9099"), "HTTP listen address for the local /metrics + /healthz endpoints")
-	segment := flag.String("segment", envOr("TMSTAT_SEGMENT", "/var/tmstat/blade/tmm0"), "path to the tmstat segment file")
-	tablesCSV := flag.String("tables", envOr("TMSTAT_TABLES", "tmm_stat,virtual_server_stat,pool_member_stat,interface_stat"), "comma-separated tmstat tables to export")
+	segment := flag.String("segment", envOr("TMSTAT_SEGMENT", "/var/tmstat/blade/tmm0"),
+		"comma-separated tmstat segment file(s). tmm splits its counters across segments (tmm0 holds "+
+			"virtual_server/pool_member/interface/tmm_stat, tmm_xnet the DPDK/SF driver tables) and a "+
+			"table absent from a segment is skipped, so listing several here replaces running one "+
+			"exporter process per segment")
+	tablesCSV := flag.String("tables", envOr("TMSTAT_TABLES",
+		"tmm_stat,virtual_server_stat,pool_member_stat,interface_stat,"+
+			"tmm/xnet/dpdk_mlnx/stats,tmm/xnet/sock/stats,tmm/xnet/dpdk_mlnx/memstats"),
+		"comma-separated tmstat tables to export (the union across all --segment files)")
 	remoteWrite := flag.String("remote-write", os.Getenv("TMSTAT_REMOTE_WRITE_URL"), "Prometheus remote_write URL to push to (empty = serve /metrics only)")
 	interval := flag.Duration("interval", envDuration("TMSTAT_PUSH_INTERVAL", 2*time.Second), "remote_write push interval")
 	extLabels := flag.String("labels", os.Getenv("TMSTAT_EXTERNAL_LABELS"), "extra label set added to every series, comma-separated k=v (e.g. cluster=calico)")
@@ -60,7 +67,7 @@ func main() {
 	flag.Parse()
 
 	e := &exporter{
-		segment:  *segment,
+		segments: splitKeepOrder(*segment),
 		tables:   splitNonEmpty(*tablesCSV),
 		extra:    parseLabels(*extLabels),
 		rwURL:    *remoteWrite,
@@ -83,7 +90,7 @@ func main() {
 
 	http.HandleFunc("/metrics", e.handleMetrics)
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		if _, err := os.Stat(*segment); err != nil {
+		if _, err := os.Stat(e.segments[0]); err != nil {
 			http.Error(w, "segment not readable: "+err.Error(), http.StatusServiceUnavailable)
 			return
 		}
@@ -94,13 +101,17 @@ func main() {
 		log.Printf("tmm-stat-exporter: remote_write to %s every %s (labels %v)", e.rwURL, e.interval, e.extra)
 		go e.pushLoop(context.Background())
 	}
-	log.Printf("tmm-stat-exporter: serving %s on %s (segment %s)", strings.Join(e.tables, ","), *listen, *segment)
+	log.Printf("tmm-stat-exporter: serving %s on %s (segments %s)", strings.Join(e.tables, ","), *listen, strings.Join(e.segments, ","))
 	srv := &http.Server{Addr: *listen, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(srv.ListenAndServe())
 }
 
 type exporter struct {
-	segment  string
+	// segments is read in order; the first is the "primary" whose readability
+	// backs f5tmm_up and /healthz. A segment that is missing or briefly
+	// unreadable is skipped, with its own f5tmm_segment_up=0, rather than
+	// failing the whole scrape: tmm creates tmm_xnet slightly after tmm0.
+	segments []string
 	tables   []string
 	extra    []label // external labels added to every series
 	rwURL    string
@@ -151,7 +162,36 @@ type label struct{ name, value string }
 // tables. Order is stable (table, then column, then row) so the text emitter can
 // group a metric family under a single TYPE line.
 func (e *exporter) collect() ([]sample, error) {
-	data, err := os.ReadFile(e.segment)
+	var out, health []sample
+	var primaryErr error
+	for i, path := range e.segments {
+		segSamples, err := e.collectSegment(path)
+		// One segment failing must not lose the others: tmm creates tmm_xnet a
+		// moment after tmm0, so a transient miss there is normal. Report it as
+		// f5tmm_segment_up=0 and carry on; only the primary backs f5tmm_up.
+		up := 1.0
+		if err != nil {
+			up = 0
+			if i == 0 {
+				primaryErr = err
+			}
+		}
+		health = append(health, sample{
+			metric: "f5tmm_segment_up",
+			labels: []label{{name: "segment", value: filepath.Base(path)}},
+			value:  up,
+		})
+		out = append(out, segSamples...)
+	}
+	// Appended as one contiguous block so the family gets a single TYPE line.
+	return append(out, health...), primaryErr
+}
+
+// collectSegment reads one tmstat segment and produces its samples. A table the
+// segment does not define is skipped, which is what lets a single exporter read
+// tmm0 and tmm_xnet with one union table list.
+func (e *exporter) collectSegment(path string) ([]sample, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -515,6 +555,19 @@ func parseLabels(s string) []label {
 			continue
 		}
 		out = append(out, label{sanitize(strings.TrimSpace(k)), strings.TrimSpace(v)})
+	}
+	return out
+}
+
+// splitKeepOrder is splitNonEmpty without the sort: for segments the ORDER is
+// meaningful (the first is the primary that backs f5tmm_up and /healthz), so
+// sorting them would silently promote whichever path happens to sort first.
+func splitKeepOrder(csv string) []string {
+	var out []string
+	for _, p := range strings.Split(csv, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
 	}
 	return out
 }
