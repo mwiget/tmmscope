@@ -1,3 +1,10 @@
 /bin/
 *.tar
 dist/
+
+# Stray `go build ./cmd/<x>` output at the repo root (no -o): the binary is
+# named after the package. Leading slash matters — an unanchored pattern would
+# also ignore the cmd/<x>/ source directories.
+/tmmscope
+/tmm-stat-exporter
+/tmm-stat-webhook
