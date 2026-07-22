@@ -198,11 +198,26 @@ func bootstrapTable(id int) *Table {
 func (s *Segment) loadSchema() error {
 	// .table: one row per table, in tableid order. We don't yet know its live
 	// row count, so walk every .table slab to the end.
+	//
+	// A table's id is its index among the OCCUPIED .table rows. tmm allocates
+	// .table in slabs and does not necessarily fill one before starting the
+	// next, so the raw slot index drifts from the true tableid wherever a slab
+	// is partially used — measured on a live segment: pool_member_stat sat at
+	// slot 1067 but is tableid 171, virtual_server_stat at 2084 vs 292 (3577
+	// slots for 421 real tables). Since .column joins on the true tableid,
+	// counting empty slots silently attaches every later table's columns to the
+	// wrong table (or to none), which is why the per-object tables looked
+	// column-less and empty. Skipping unoccupied slots restores the identity
+	// exactly (verified: tmm_stat 7, interface_stat 43, pool_member_stat 171,
+	// virtual_server_stat 292).
 	tmeta := bootstrapTable(tidTable)
 	var tables []*Table
 	s.walkSlabRows(tidTable, -1, func(raw []byte) {
 		r := Row{tbl: tmeta, raw: raw}
 		name := r.Str("name")
+		if name == "" {
+			return // unused slot in a partially-filled slab, not a table
+		}
 		t := &Table{
 			Name:    name,
 			ID:      len(tables),
@@ -215,11 +230,6 @@ func (s *Segment) loadSchema() error {
 	if len(tables) == 0 {
 		return fmt.Errorf("tmstat: no tables found")
 	}
-	// Row 0 is .table describing itself; its row count is the true number of
-	// tables. Drop any trailing slots read from the last (partial) .table slab.
-	if n := tables[0].Rows; n > 0 && n < len(tables) {
-		tables = tables[:n]
-	}
 	for _, t := range tables {
 		s.order = append(s.order, t)
 		s.byID[t.ID] = t
@@ -229,14 +239,18 @@ func (s *Segment) loadSchema() error {
 	}
 
 	// .column: attach each column to its owning table (by tableid).
+	// Walk every .column slab for the same reason: .column's own live row count
+	// lags on a running tmm (694 reported vs ~9k real columns), and stopping
+	// there truncates the tail of each table's column list — interface_stat kept
+	// only its first 4 of 81 columns, so counters.bytes_in/pkts_in never made it
+	// out. Unoccupied slots are skipped by name, as above; without that they
+	// would all read tableid 0 and pollute .table's own schema.
 	cmeta := bootstrapTable(tidColumn)
-	colTbl := s.byID[tidColumn]
-	colRows := -1
-	if colTbl != nil {
-		colRows = colTbl.Rows
-	}
-	s.walkSlabRows(tidColumn, colRows, func(raw []byte) {
+	s.walkSlabRows(tidColumn, -1, func(raw []byte) {
 		r := Row{tbl: cmeta, raw: raw}
+		if r.Str("name") == "" {
+			return
+		}
 		tid := int(r.Uint("tableid"))
 		t := s.byID[tid]
 		if t == nil {
@@ -310,8 +324,21 @@ func (s *Segment) RawRows(name string) ([]Row, error) {
 	if t == nil {
 		return nil, fmt.Errorf("tmstat: no such table %q", name)
 	}
+	// Walk every slab and skip unoccupied slots rather than taking the first
+	// t.Rows in file order: a table's slabs need not be filled front-to-back, so
+	// leading empty slots would otherwise consume the whole row budget and the
+	// real rows would never be reached. Measured on a live segment,
+	// pool_member_stat returned 43 all-zero rows that key-aggregated into a
+	// single {pool_name="",addr="::"} row while its 43 real members sat further
+	// in. t.Rows is still honoured as the live row count once empties are gone.
 	rows := make([]Row, 0, t.Rows)
-	s.walkSlabRows(t.ID, t.Rows, func(raw []byte) {
+	s.walkSlabRows(t.ID, -1, func(raw []byte) {
+		if t.Rows > 0 && len(rows) >= t.Rows {
+			return
+		}
+		if allZero(raw) {
+			return // unoccupied slot
+		}
 		// Copy the row so callers may retain it past the next read.
 		b := make([]byte, len(raw))
 		copy(b, raw)
@@ -508,4 +535,15 @@ func addrHex(b []byte) string {
 		out = append(out, hex[x>>4], hex[x&0xf])
 	}
 	return string(out)
+}
+
+// allZero reports whether a raw row is entirely zero bytes — tmstat's marker for
+// an unoccupied slot inside an allocated slab.
+func allZero(b []byte) bool {
+	for _, c := range b {
+		if c != 0 {
+			return false
+		}
+	}
+	return true
 }

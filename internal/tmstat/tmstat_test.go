@@ -2,6 +2,7 @@ package tmstat
 
 import (
 	"compress/gzip"
+	"encoding/binary"
 	"io"
 	"os"
 	"path/filepath"
@@ -164,4 +165,89 @@ func itoa(i int) string {
 		b[p] = '-'
 	}
 	return string(b[p:])
+}
+
+// buildSparseSegment synthesizes a minimal TMSS segment whose .table slab has an
+// UNOCCUPIED slot in the middle, and whose data table has an unoccupied leading
+// slot. Both mirror what a live tmm segment does (it does not fill a slab before
+// allocating the next), and both used to corrupt the parse: the empty .table slot
+// shifted every later table's id off its .column join, and the empty data slot
+// consumed the row budget so the real row was never reached.
+func buildSparseSegment() []byte {
+	const slab = 4096
+	buf := make([]byte, slab*3)
+	hdr := func(sl, tableid, linesPerRow int) {
+		b := sl * slab
+		copy(buf[b:], magic)
+		binary.LittleEndian.PutUint16(buf[b+4:], uint16(tableid))
+		binary.LittleEndian.PutUint16(buf[b+6:], uint16(linesPerRow))
+		binary.LittleEndian.PutUint32(buf[b+16:], uint32(sl)<<8|0xff)
+	}
+	// slab 0 = .table (stride 128). Slot 2 is deliberately left all-zero.
+	hdr(0, tidTable, 2)
+	tableRow := func(slot int, name string, rows, rowsz, cols int) {
+		o := 0*slab + slabHdrSize + slot*128
+		copy(buf[o:], name)
+		binary.LittleEndian.PutUint32(buf[o+53:], uint32(rows))
+		binary.LittleEndian.PutUint16(buf[o+57:], uint16(rowsz))
+		binary.LittleEndian.PutUint16(buf[o+59:], uint16(cols))
+	}
+	tableRow(0, ".table", 3, 128, 4)
+	tableRow(1, ".column", 2, 64, 7)
+	// slot 2 intentionally empty
+	tableRow(3, "widget_stat", 1, 16, 2)
+
+	// slab 1 = .column (stride 64). widget_stat must be tableid 2, not 3.
+	hdr(1, tidColumn, 1)
+	colRow := func(slot int, name string, tableid, offset, size, typ, rule int) {
+		o := 1*slab + slabHdrSize + slot*64
+		copy(buf[o:], name)
+		binary.LittleEndian.PutUint16(buf[o+49:], uint16(tableid))
+		binary.LittleEndian.PutUint16(buf[o+51:], uint16(offset))
+		binary.LittleEndian.PutUint16(buf[o+53:], uint16(size))
+		buf[o+55] = byte(typ)
+		binary.LittleEndian.PutUint16(buf[o+56:], uint16(rule))
+	}
+	colRow(0, "key", 2, 0, 8, typeString, ruleKey)
+	colRow(1, "count", 2, 8, 8, typeUnsignedInt, ruleCounter)
+
+	// slab 2 = widget_stat data (stride 64); slot 0 empty, real row at slot 1.
+	hdr(2, 2, 1)
+	o := 2*slab + slabHdrSize + 1*64
+	copy(buf[o:], "w1")
+	binary.LittleEndian.PutUint64(buf[o+8:], 42)
+	return buf
+}
+
+func TestSparseSlabsKeepTableIdentity(t *testing.T) {
+	seg, err := Parse(buildSparseSegment())
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	w := seg.Table("widget_stat")
+	if w == nil {
+		t.Fatal("widget_stat missing")
+	}
+	// The empty .table slot must NOT consume an id, or .column (which joins on
+	// the true tableid) attaches widget_stat's columns to the wrong table.
+	if w.ID != 2 {
+		t.Errorf("widget_stat id = %d, want 2 (empty .table slot must not take an id)", w.ID)
+	}
+	if len(w.Columns) != 2 {
+		t.Fatalf("widget_stat columns = %d, want 2 (columns lost: id/join drifted)", len(w.Columns))
+	}
+	rows, err := seg.Rows("widget_stat")
+	if err != nil {
+		t.Fatalf("rows: %v", err)
+	}
+	// The empty leading data slot must be skipped, not counted against t.Rows.
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1 (empty leading slot must be skipped)", len(rows))
+	}
+	if got := rows[0].Str("key"); got != "w1" {
+		t.Errorf("key = %q, want w1", got)
+	}
+	if got := rows[0].Uint("count"); got != 42 {
+		t.Errorf("count = %d, want 42", got)
+	}
 }

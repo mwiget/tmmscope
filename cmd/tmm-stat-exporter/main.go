@@ -183,7 +183,10 @@ func (e *exporter) collect() ([]sample, error) {
 		// users, never their traffic. Filtering here keeps them out of Prometheus
 		// entirely (not just hidden in a panel).
 		rows = dropInternal(rows, keyCols)
-		prefix := "f5tmm_" + strings.TrimSuffix(name, "_stat") + "_"
+		// Sanitize the table name too, not just the column: nested tables carry
+		// slashes (tmm/xnet/dpdk_mlnx/stats), which are illegal in a Prometheus
+		// metric name — unsanitized they produce series remote_write rejects.
+		prefix := "f5tmm_" + sanitize(strings.TrimSuffix(name, "_stat")) + "_"
 		for _, c := range valCols {
 			metric := prefix + sanitize(c.Name)
 			for _, r := range rows {
