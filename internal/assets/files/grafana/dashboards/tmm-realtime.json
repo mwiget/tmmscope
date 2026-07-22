@@ -744,6 +744,219 @@
     }
    ],
    "description": "Dataplane SFs are 1.1 / 1.2; 0.1 is management and tap:31 the kernel tap. NOTE: on a DOCA/DPDK hardware-offloaded datapath (BlueField), established flows are handled in hardware and never reach TMM's software byte counters \u2014 so this UNDER-REPORTS real traffic by orders of magnitude (measured: 92 KB counted while ~39 GB actually moved). Verified equal to tmctl, so it is TMM's accounting, not the reader. Use it for shape/attribution, not absolute throughput; for real bytes read the DPU's OVS/DOCA flow counters (ovs-appctl dpctl/dump-flows)."
+  },
+  {
+   "id": 27,
+   "type": "timeseries",
+   "title": "Real dataplane throughput per tenant (bit/s, hardware-offloaded)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 56
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant) (rate(ovs_doca_datapath_bytes{cluster=\"$cluster\",port=~\"p0|p1\"}[$__rate_interval]))*8",
+     "legendFormat": "{{tenant}}"
+    }
+   ],
+   "description": "Ground truth for what actually crossed the wire, from OVS per-flow counters read back from hardware. Filtered to the FABRIC ports (p0/p1) on purpose: a packet is counted at every datapath port it traverses (p1 -> pf1hpf -> SF and back), so summing across all ports multi-counts by ~5x. These are the real hardware-offloaded bytes, unlike the TMM 'software path only' panels. OVS refreshes hardware flow counters on its revalidator cadence (~5 s), so short rate windows look lumpy; widen the range or use a longer $__rate_interval for a smooth line."
+  },
+  {
+   "id": 28,
+   "type": "timeseries",
+   "title": "Real dataplane packet rate per tenant (fabric ports)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 56
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant) (rate(ovs_doca_datapath_packets{cluster=\"$cluster\",port=~\"p0|p1\"}[$__rate_interval]))",
+     "legendFormat": "{{tenant}}"
+    }
+   ],
+   "description": "Filtered to the FABRIC ports (p0/p1) on purpose: a packet is counted at every datapath port it traverses (p1 -> pf1hpf -> SF and back), so summing across all ports multi-counts by ~5x. These are the real hardware-offloaded bytes, unlike the TMM 'software path only' panels."
+  },
+  {
+   "id": 29,
+   "type": "timeseries",
+   "title": "Dataplane throughput by port (bit/s)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 64
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (node, port) (rate(ovs_doca_datapath_bytes{cluster=\"$cluster\"}[$__rate_interval]))*8",
+     "legendFormat": "{{node}} {{port}}"
+    }
+   ],
+   "description": "Per-port view: p0/p1 are the fabric uplinks, pf0hpf/pf1hpf face the host, en3f0pf0sfNNN are the service functions. Useful for seeing where a packet is spending its hops."
+  },
+  {
+   "id": 30,
+   "type": "timeseries",
+   "title": "OVS datapath flows (offloaded vs total)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 64
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "ovs_doca_flows{cluster=\"$cluster\"}",
+     "legendFormat": "{{node}} total"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "ovs_doca_flows_offloaded{cluster=\"$cluster\"}",
+     "legendFormat": "{{node}} offloaded"
+    }
+   ],
+   "description": "If offloaded drops below total, flows are falling back to software \u2014 the datapath is about to get much slower."
   }
  ]
 }
