@@ -765,7 +765,10 @@
      "custom": {
       "drawStyle": "line",
       "fillOpacity": 10,
-      "showPoints": "never"
+      "showPoints": "auto",
+      "pointSize": 5,
+      "spanNulls": true,
+      "lineInterpolation": "smooth"
      }
     },
     "overrides": []
@@ -791,10 +794,12 @@
       "uid": "tmm-telemetry"
      },
      "expr": "sum by (tenant) (rate(ovs_doca_datapath_bytes{cluster=\"$cluster\",port=~\"pf0hpf|pf1hpf\"}[$__rate_interval]))*8",
-     "legendFormat": "{{tenant}}"
+     "legendFormat": "{{tenant}}",
+     "interval": "30s"
     }
    ],
-   "description": "Filtered to the HOST-facing ports (pf0hpf/pf1hpf) \u2014 the leg carrying the full proxied flow. Validated against the load generator: an 83.8 s sustained run measured 5.83 GB/s = 46.6 Gbit/s client-side, and this panel read a 47.04 Gbit/s median. Do NOT sum across all ports: a packet is counted at every port it traverses (measured 501 GB across all ports vs 103 GB on the fabric ports for one bench), and the fabric ports (p0/p1) see only one leg, reading ~2x low. OVS refreshes hardware flow counters on its ~5 s revalidator cadence, so bursts shorter than the rate window read low \u2014 use sustained load for true plateaus."
+   "description": "Filtered to the HOST-facing ports (pf0hpf/pf1hpf) \u2014 the leg carrying the full proxied flow. Validated against the load generator: an 83.8 s sustained run measured 5.83 GB/s = 46.6 Gbit/s client-side, and this panel read a 47.04 Gbit/s median. Do NOT sum across all ports: a packet is counted at every port it traverses (measured 501 GB across all ports vs 103 GB on the fabric ports for one bench), and the fabric ports (p0/p1) see only one leg, reading ~2x low. OVS refreshes hardware flow counters on its ~5 s revalidator cadence, so bursts shorter than the rate window read low \u2014 use sustained load for true plateaus. Rendering: a minimum step of 30 s is set so $__rate_interval stays wide enough to span OVS's ~5 s hardware-counter refresh \u2014 without it, zooming in makes a short burst collapse into one tall point that looks like a broken line. The series has no gaps; flat stretches are real zeros between load phases. Points are shown so an isolated sample is visible as a point rather than reading as a break.",
+   "interval": "30s"
   },
   {
    "id": 28,
@@ -816,7 +821,10 @@
      "custom": {
       "drawStyle": "line",
       "fillOpacity": 10,
-      "showPoints": "never"
+      "showPoints": "auto",
+      "pointSize": 5,
+      "spanNulls": true,
+      "lineInterpolation": "smooth"
      }
     },
     "overrides": []
@@ -842,10 +850,12 @@
       "uid": "tmm-telemetry"
      },
      "expr": "sum by (tenant) (rate(ovs_doca_datapath_packets{cluster=\"$cluster\",port=~\"pf0hpf|pf1hpf\"}[$__rate_interval]))",
-     "legendFormat": "{{tenant}}"
+     "legendFormat": "{{tenant}}",
+     "interval": "30s"
     }
    ],
-   "description": "Filtered to the HOST-facing ports (pf0hpf/pf1hpf) \u2014 the leg carrying the full proxied flow. Validated against the load generator: an 83.8 s sustained run measured 5.83 GB/s = 46.6 Gbit/s client-side, and this panel read a 47.04 Gbit/s median. Do NOT sum across all ports: a packet is counted at every port it traverses (measured 501 GB across all ports vs 103 GB on the fabric ports for one bench), and the fabric ports (p0/p1) see only one leg, reading ~2x low. OVS refreshes hardware flow counters on its ~5 s revalidator cadence, so bursts shorter than the rate window read low \u2014 use sustained load for true plateaus."
+   "description": "Filtered to the HOST-facing ports (pf0hpf/pf1hpf) \u2014 the leg carrying the full proxied flow. Validated against the load generator: an 83.8 s sustained run measured 5.83 GB/s = 46.6 Gbit/s client-side, and this panel read a 47.04 Gbit/s median. Do NOT sum across all ports: a packet is counted at every port it traverses (measured 501 GB across all ports vs 103 GB on the fabric ports for one bench), and the fabric ports (p0/p1) see only one leg, reading ~2x low. OVS refreshes hardware flow counters on its ~5 s revalidator cadence, so bursts shorter than the rate window read low \u2014 use sustained load for true plateaus. Rendering: a minimum step of 30 s is set so $__rate_interval stays wide enough to span OVS's ~5 s hardware-counter refresh \u2014 without it, zooming in makes a short burst collapse into one tall point that looks like a broken line. The series has no gaps; flat stretches are real zeros between load phases. Points are shown so an isolated sample is visible as a point rather than reading as a break.",
+   "interval": "30s"
   },
   {
    "id": 29,
@@ -867,7 +877,10 @@
      "custom": {
       "drawStyle": "line",
       "fillOpacity": 10,
-      "showPoints": "never"
+      "showPoints": "auto",
+      "pointSize": 5,
+      "spanNulls": true,
+      "lineInterpolation": "smooth"
      }
     },
     "overrides": []
@@ -893,10 +906,12 @@
       "uid": "tmm-telemetry"
      },
      "expr": "sum by (node, port) (rate(ovs_doca_datapath_bytes{cluster=\"$cluster\"}[$__rate_interval]))*8",
-     "legendFormat": "{{node}} {{port}}"
+     "legendFormat": "{{node}} {{port}}",
+     "interval": "30s"
     }
    ],
-   "description": "Per-port view: p0/p1 are the fabric uplinks, pf0hpf/pf1hpf face the host, en3f0pf0sfNNN are the service functions. Useful for seeing where a packet is spending its hops."
+   "description": "Per-port view: p0/p1 are the fabric uplinks, pf0hpf/pf1hpf face the host, en3f0pf0sfNNN are the service functions. Useful for seeing where a packet is spending its hops. Rendering: a minimum step of 30 s is set so $__rate_interval stays wide enough to span OVS's ~5 s hardware-counter refresh \u2014 without it, zooming in makes a short burst collapse into one tall point that looks like a broken line. The series has no gaps; flat stretches are real zeros between load phases. Points are shown so an isolated sample is visible as a point rather than reading as a break.",
+   "interval": "30s"
   },
   {
    "id": 30,
