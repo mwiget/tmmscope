@@ -93,7 +93,7 @@
   {
    "id": 2,
    "type": "timeseries",
-   "title": "TMM client throughput (bit/s)",
+   "title": "TMM client throughput (bit/s, software path only)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -138,7 +138,8 @@
      "expr": "rate(f5tmm_tmm_client_side_traffic_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
      "legendFormat": "{{pod}}"
     }
-   ]
+   ],
+   "description": "NOTE: on a DOCA/DPDK hardware-offloaded datapath (BlueField), established flows are handled in hardware and never reach TMM's software byte counters \u2014 so this UNDER-REPORTS real traffic by orders of magnitude (measured: 92 KB counted while ~39 GB actually moved). Verified equal to tmctl, so it is TMM's accounting, not the reader. Use it for shape/attribution, not absolute throughput; for real bytes read the DPU's OVS/DOCA flow counters (ovs-appctl dpctl/dump-flows)."
   },
   {
    "id": 3,
@@ -193,7 +194,7 @@
   {
    "id": 4,
    "type": "timeseries",
-   "title": "Interface throughput in (bit/s)",
+   "title": "Interface throughput in (bit/s, software path only)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -238,7 +239,8 @@
      "expr": "rate(f5tmm_interface_counters_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
      "legendFormat": "{{node}} {{name}}"
     }
-   ]
+   ],
+   "description": "NOTE: on a DOCA/DPDK hardware-offloaded datapath (BlueField), established flows are handled in hardware and never reach TMM's software byte counters \u2014 so this UNDER-REPORTS real traffic by orders of magnitude (measured: 92 KB counted while ~39 GB actually moved). Verified equal to tmctl, so it is TMM's accounting, not the reader. Use it for shape/attribution, not absolute throughput; for real bytes read the DPU's OVS/DOCA flow counters (ovs-appctl dpctl/dump-flows)."
   },
   {
    "id": 5,
@@ -293,7 +295,7 @@
   {
    "id": 6,
    "type": "timeseries",
-   "title": "Virtual-server connection rate (\u2248 req/s)",
+   "title": "Virtual-server connection rate (new conns/s)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -338,12 +340,13 @@
      "expr": "rate(f5tmm_virtual_server_clientside_tot_conns{cluster=\"$cluster\"}[$__rate_interval])",
      "legendFormat": "{{name}}"
     }
-   ]
+   ],
+   "description": "Connections per second, NOT requests: with HTTP keep-alive one connection carries many requests (a 289k req/s bench shows ~7 conn/s across 128 connections). For request rate, use the load generator."
   },
   {
    "id": 20,
    "type": "timeseries",
-   "title": "Per-tenant connection rate (\u2248 req/s)",
+   "title": "Per-tenant connection rate (new conns/s)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -389,12 +392,12 @@
      "legendFormat": "{{tenant}}"
     }
    ],
-   "description": "Virtual-server accepts/s summed per tenant (both DPUs). Tenant parsed from the VS name, which embeds it."
+   "description": "Connections per second, NOT requests: with HTTP keep-alive one connection carries many requests (a 289k req/s bench shows ~7 conn/s across 128 connections). For request rate, use the load generator. Tenant parsed from the VS name, which embeds it."
   },
   {
    "id": 21,
    "type": "timeseries",
-   "title": "Per-tenant client throughput (bit/s)",
+   "title": "Per-tenant client throughput (bit/s, software path only)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -448,7 +451,8 @@
      "expr": "sum by (tenant) (label_replace(rate(f5tmm_virtual_server_clientside_bytes_in{cluster=\"$cluster\"}[$__rate_interval]), \"tenant\", \"$1\", \"name\", \"tenant-([^-]+)-.*\"))*8",
      "legendFormat": "{{tenant}} in"
     }
-   ]
+   ],
+   "description": "NOTE: on a DOCA/DPDK hardware-offloaded datapath (BlueField), established flows are handled in hardware and never reach TMM's software byte counters \u2014 so this UNDER-REPORTS real traffic by orders of magnitude (measured: 92 KB counted while ~39 GB actually moved). Verified equal to tmctl, so it is TMM's accounting, not the reader. Use it for shape/attribution, not absolute throughput; for real bytes read the DPU's OVS/DOCA flow counters (ovs-appctl dpctl/dump-flows)."
   },
   {
    "id": 22,
@@ -499,12 +503,12 @@
      "legendFormat": "{{tenant}} \u2192 {{addr}}"
     }
    ],
-   "description": "Live server-side connections per origin. Flat-zero here with idle keepalive traffic is normal; watch it under bench."
+   "description": "Live server-side connections per origin. Accurate \u2014 connection state is TMM's, not offloaded."
   },
   {
    "id": 23,
    "type": "timeseries",
-   "title": "Pool-member connection rate (load balance check)",
+   "title": "Pool-member connection rate (load-balance check)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -550,7 +554,7 @@
      "legendFormat": "{{tenant}} \u2192 {{addr}}"
     }
    ],
-   "description": "Should split evenly across each tenant's two origins; divergence means LB skew."
+   "description": "New server-side connections/s per origin \u2014 should split evenly across each tenant's two origins; divergence means LB skew. Connection counts ARE accurate (setup goes through TMM)."
   },
   {
    "id": 24,
@@ -601,7 +605,7 @@
      "legendFormat": "{{pod}} {{id}}"
     }
    ],
-   "description": "From the tmm_xnet segment (separate from tmm0): per-SF RX on the BlueField DPDK ports."
+   "description": "From the tmm_xnet segment. Counts the SF slow path only; offloaded flows bypass it. NOTE: on a DOCA/DPDK hardware-offloaded datapath (BlueField), established flows are handled in hardware and never reach TMM's software byte counters \u2014 so this UNDER-REPORTS real traffic by orders of magnitude (measured: 92 KB counted while ~39 GB actually moved). Verified equal to tmctl, so it is TMM's accounting, not the reader. Use it for shape/attribution, not absolute throughput; for real bytes read the DPU's OVS/DOCA flow counters (ovs-appctl dpctl/dump-flows)."
   },
   {
    "id": 25,
@@ -684,7 +688,7 @@
   {
    "id": 26,
    "type": "timeseries",
-   "title": "TMM interface throughput (bit/s, in+out)",
+   "title": "TMM interface throughput (bit/s, in+out, software path only)",
    "datasource": {
     "type": "prometheus",
     "uid": "tmm-telemetry"
@@ -739,7 +743,7 @@
      "legendFormat": "{{pod}} {{name}} out"
     }
    ],
-   "description": "Dataplane SFs are 1.1 / 1.2; 0.1 is management and tap:31 the kernel tap."
+   "description": "Dataplane SFs are 1.1 / 1.2; 0.1 is management and tap:31 the kernel tap. NOTE: on a DOCA/DPDK hardware-offloaded datapath (BlueField), established flows are handled in hardware and never reach TMM's software byte counters \u2014 so this UNDER-REPORTS real traffic by orders of magnitude (measured: 92 KB counted while ~39 GB actually moved). Verified equal to tmctl, so it is TMM's accounting, not the reader. Use it for shape/attribution, not absolute throughput; for real bytes read the DPU's OVS/DOCA flow counters (ovs-appctl dpctl/dump-flows)."
   }
  ]
 }
