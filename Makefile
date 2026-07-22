@@ -1,4 +1,4 @@
-.PHONY: all build test tidy fmt vet clean exporter-image exporter-buildx exporter-load webhook-image webhook-buildx webhook-load images-buildx install
+.PHONY: all build test tidy fmt vet clean ovs-doca-buildx exporter-image exporter-buildx exporter-load webhook-image webhook-buildx webhook-load images-buildx install
 
 # tmmscope — standalone real-time TMM telemetry (Prometheus + Grafana + sidecar injection).
 
@@ -45,6 +45,7 @@ GHCR_IMAGE     ?= ghcr.io/mwiget/tmm-stat-exporter
 PLATFORMS      ?= linux/amd64,linux/arm64
 
 WEBHOOK_GHCR   ?= ghcr.io/mwiget/tmm-stat-webhook
+OVSDOCA_GHCR   ?= ghcr.io/mwiget/ovs-doca-exporter
 
 # Multi-arch build + push to ghcr (CI uses these on a tag). Requires `docker
 # buildx` and a logged-in registry.
@@ -60,7 +61,13 @@ webhook-buildx:
 	  -t $(WEBHOOK_GHCR):$(VERSION) -t $(WEBHOOK_GHCR):latest \
 	  --push .
 
-images-buildx: exporter-buildx webhook-buildx
+ovs-doca-buildx:
+	docker buildx build --platform $(PLATFORMS) \
+	  -f cmd/ovs-doca-exporter/Dockerfile \
+	  -t $(OVSDOCA_GHCR):$(VERSION) -t $(OVSDOCA_GHCR):latest \
+	  --push .
+
+images-buildx: exporter-buildx webhook-buildx ovs-doca-buildx
 
 # ── Local fallback: build + import into k3s nodes (no registry) ───────────────
 # Only for clusters that can't pull from ghcr. EXPORTER_ARCH must match the
