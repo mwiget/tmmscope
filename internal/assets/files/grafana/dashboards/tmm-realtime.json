@@ -1,344 +1,745 @@
 {
-  "id": null,
-  "uid": "tmm-realtime",
-  "title": "TMM Real-Time",
-  "tags": [
-    "tmm",
-    "telemetry"
-  ],
-  "timezone": "browser",
-  "schemaVersion": 39,
-  "version": 3,
-  "refresh": "5s",
-  "time": {
-    "from": "now-15m",
-    "to": "now"
-  },
-  "templating": {
-    "list": [
-      {
-        "name": "cluster",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "tmm-telemetry"
-        },
-        "query": {
-          "query": "label_values(f5tmm_up, cluster)",
-          "refId": "var"
-        },
-        "refresh": 2,
-        "sort": 1,
-        "includeAll": false,
-        "multi": false,
-        "current": {}
-      }
-    ]
-  },
-  "panels": [
-    {
-      "id": 1,
-      "type": "timeseries",
-      "title": "TMM CPU utilisation % (cycles-based, stacked by node)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "tmm-telemetry"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 40,
-            "showPoints": "never",
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "tmm-telemetry"
-          },
-          "expr": "(1 - rate(f5tmm_tmm_tm_idle_cycles{cluster=\"$cluster\"}[$__rate_interval]) / rate(f5tmm_tmm_tm_total_cycles{cluster=\"$cluster\"}[$__rate_interval])) * 100",
-          "legendFormat": "{{node}}"
-        }
-      ]
+ "id": null,
+ "uid": "tmm-realtime",
+ "title": "TMM Real-Time",
+ "tags": [
+  "tmm",
+  "telemetry"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "version": 3,
+ "refresh": "5s",
+ "time": {
+  "from": "now-15m",
+  "to": "now"
+ },
+ "templating": {
+  "list": [
+   {
+    "name": "cluster",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "tmm-telemetry"
     },
-    {
-      "id": 2,
-      "type": "timeseries",
-      "title": "TMM client throughput (bit/s)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "tmm-telemetry"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bps",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "tmm-telemetry"
-          },
-          "expr": "rate(f5tmm_tmm_client_side_traffic_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
-          "legendFormat": "{{pod}}"
-        }
-      ]
+    "query": {
+     "query": "label_values(f5tmm_up, cluster)",
+     "refId": "var"
     },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "TMM current connections",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "tmm-telemetry"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "tmm-telemetry"
-          },
-          "expr": "f5tmm_tmm_client_side_traffic_cur_conns{cluster=\"$cluster\"}",
-          "legendFormat": "{{pod}}"
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Interface throughput in (bit/s)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "tmm-telemetry"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bps",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "tmm-telemetry"
-          },
-          "expr": "rate(f5tmm_interface_counters_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
-          "legendFormat": "{{node}} {{name}}"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Pool-member current connections",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "tmm-telemetry"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "tmm-telemetry"
-          },
-          "expr": "f5tmm_pool_member_serverside_cur_conns{cluster=\"$cluster\"}",
-          "legendFormat": "{{pool_name}} {{addr}}"
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Virtual-server connection rate (\u2248 req/s)",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "tmm-telemetry"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "tmm-telemetry"
-          },
-          "expr": "rate(f5tmm_virtual_server_clientside_tot_conns{cluster=\"$cluster\"}[$__rate_interval])",
-          "legendFormat": "{{name}}"
-        }
-      ]
-    }
+    "refresh": 2,
+    "sort": 1,
+    "includeAll": false,
+    "multi": false,
+    "current": {}
+   }
   ]
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "TMM CPU utilisation % (cycles-based, stacked by node)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 0
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 40,
+      "showPoints": "never",
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "(1 - rate(f5tmm_tmm_tm_idle_cycles{cluster=\"$cluster\"}[$__rate_interval]) / rate(f5tmm_tmm_tm_total_cycles{cluster=\"$cluster\"}[$__rate_interval])) * 100",
+     "legendFormat": "{{node}}"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "TMM client throughput (bit/s)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 0
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_tmm_client_side_traffic_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
+     "legendFormat": "{{pod}}"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "timeseries",
+   "title": "TMM current connections",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "f5tmm_tmm_client_side_traffic_cur_conns{cluster=\"$cluster\"}",
+     "legendFormat": "{{pod}}"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "timeseries",
+   "title": "Interface throughput in (bit/s)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_interface_counters_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
+     "legendFormat": "{{node}} {{name}}"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Pool-member current connections",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 16
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "f5tmm_pool_member_serverside_cur_conns{cluster=\"$cluster\"}",
+     "legendFormat": "{{pool_name}} {{addr}}"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "Virtual-server connection rate (\u2248 req/s)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 16
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_virtual_server_clientside_tot_conns{cluster=\"$cluster\"}[$__rate_interval])",
+     "legendFormat": "{{name}}"
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "type": "timeseries",
+   "title": "Per-tenant connection rate (\u2248 req/s)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 24
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant) (label_replace(rate(f5tmm_virtual_server_clientside_tot_conns{cluster=\"$cluster\"}[$__rate_interval]), \"tenant\", \"$1\", \"name\", \"tenant-([^-]+)-.*\"))",
+     "legendFormat": "{{tenant}}"
+    }
+   ],
+   "description": "Virtual-server accepts/s summed per tenant (both DPUs). Tenant parsed from the VS name, which embeds it."
+  },
+  {
+   "id": 21,
+   "type": "timeseries",
+   "title": "Per-tenant client throughput (bit/s)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 24
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant) (label_replace(rate(f5tmm_virtual_server_clientside_bytes_out{cluster=\"$cluster\"}[$__rate_interval]), \"tenant\", \"$1\", \"name\", \"tenant-([^-]+)-.*\"))*8",
+     "legendFormat": "{{tenant}} out"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant) (label_replace(rate(f5tmm_virtual_server_clientside_bytes_in{cluster=\"$cluster\"}[$__rate_interval]), \"tenant\", \"$1\", \"name\", \"tenant-([^-]+)-.*\"))*8",
+     "legendFormat": "{{tenant}} in"
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "type": "timeseries",
+   "title": "Pool-member current connections (per tenant)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 32
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant, addr) (label_replace(f5tmm_pool_member_serverside_cur_conns{cluster=\"$cluster\",pool_name=~\"tenant.*\"}, \"tenant\", \"$1\", \"pool_name\", \"tenant-([^-]+)-.*\"))",
+     "legendFormat": "{{tenant}} \u2192 {{addr}}"
+    }
+   ],
+   "description": "Live server-side connections per origin. Flat-zero here with idle keepalive traffic is normal; watch it under bench."
+  },
+  {
+   "id": 23,
+   "type": "timeseries",
+   "title": "Pool-member connection rate (load balance check)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 32
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "sum by (tenant, addr) (label_replace(rate(f5tmm_pool_member_serverside_tot_conns{cluster=\"$cluster\",pool_name=~\"tenant.*\"}[$__rate_interval]), \"tenant\", \"$1\", \"pool_name\", \"tenant-([^-]+)-.*\"))",
+     "legendFormat": "{{tenant}} \u2192 {{addr}}"
+    }
+   ],
+   "description": "Should split evenly across each tenant's two origins; divergence means LB skew."
+  },
+  {
+   "id": 24,
+   "type": "timeseries",
+   "title": "SF (DPDK) receive rate \u2014 per service function",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 40
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_tmm_xnet_dpdk_mlnx_stats_received{cluster=\"$cluster\"}[$__rate_interval])",
+     "legendFormat": "{{pod}} {{id}}"
+    }
+   ],
+   "description": "From the tmm_xnet segment (separate from tmm0): per-SF RX on the BlueField DPDK ports."
+  },
+  {
+   "id": 25,
+   "type": "timeseries",
+   "title": "SF ring drops & errors",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 40
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_tmm_xnet_sock_stats_mmap_ring_drops{cluster=\"$cluster\"}[$__rate_interval])",
+     "legendFormat": "{{pod}} {{ifname}} ring drops"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_tmm_xnet_sock_stats_rx_buf_err{cluster=\"$cluster\"}[$__rate_interval])",
+     "legendFormat": "{{pod}} {{ifname}} rx buf err"
+    },
+    {
+     "refId": "C",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_tmm_xnet_sock_stats_rx_io_err{cluster=\"$cluster\"}[$__rate_interval])",
+     "legendFormat": "{{pod}} {{ifname}} rx io err"
+    },
+    {
+     "refId": "D",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_tmm_xnet_sock_stats_tx_err{cluster=\"$cluster\"}[$__rate_interval])",
+     "legendFormat": "{{pod}} {{ifname}} tx err"
+    }
+   ],
+   "description": "Non-zero here means the SF ring is overrunning \u2014 the first thing to check on a throughput regression."
+  },
+  {
+   "id": 26,
+   "type": "timeseries",
+   "title": "TMM interface throughput (bit/s, in+out)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "tmm-telemetry"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 48
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "custom": {
+      "drawStyle": "line",
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_interface_counters_bytes_in{cluster=\"$cluster\"}[$__rate_interval])*8",
+     "legendFormat": "{{pod}} {{name}} in"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "tmm-telemetry"
+     },
+     "expr": "rate(f5tmm_interface_counters_bytes_out{cluster=\"$cluster\"}[$__rate_interval])*8",
+     "legendFormat": "{{pod}} {{name}} out"
+    }
+   ],
+   "description": "Dataplane SFs are 1.1 / 1.2; 0.1 is management and tap:31 the kernel tap."
+  }
+ ]
 }
